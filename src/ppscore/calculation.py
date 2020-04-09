@@ -1,0 +1,282 @@
+# %%
+from sklearn import tree
+from sklearn import preprocessing
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import mean_absolute_error, f1_score
+
+import pandas as pd
+from pandas.api.types import (
+    is_numeric_dtype,
+    is_bool_dtype,
+    is_categorical_dtype,
+    is_string_dtype,
+    is_datetime64_any_dtype,
+    is_timedelta64_dtype,
+)
+
+# if the number is 4, then it is possible to detect patterns when there are at least 4 times the same x observation. If the limit is increased, the minimum observations also increase. This is important, because this is the limit when sklearn will throw an error which will lead to a score of 0 if we catch it
+CV_ITERATIONS = 4
+
+RANDOM_SEED = 587136
+
+# if a numeric column has less than 15 unique values, it is inferred as categoric
+# thus, the ppscore will use a classification
+# this has important implications on the ppscore
+# eg if you have 4 equal categories encoded 0, 1, 2, 3 and treat it as a regression
+# then the baseline is 1.5 which is quite good and a predictor will have a harder time
+# to beat the baseline, thus the ppscore will be considerably lower
+# if the column is encoded as category, then the baseline will be to always predict 0
+# this baseline will be way easier to beat and thus result in a higher ppscore
+NUMERIC_AS_CATEGORIC_BREAKPOINT = 15
+
+
+# %%
+# https://scikit-learn.org/stable/modules/tree.html
+
+# https://scikit-learn.org/stable/modules/cross_validation.html
+# https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
+def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
+    # shuffle the rows - this is important for crossvalidation
+    # because the crossvalidation just takes the first n lines
+    # if there is a strong pattern in the rows eg 0,0,0,0,1,1,1,1
+    # then this will lead to problems because the first cv sees mostly 0 and the later 1
+    # this approach might be wrong for timeseries because it might leak information
+    df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
+
+    # preprocess target
+    if df[target].dtype == object:
+        le = preprocessing.LabelEncoder()
+        df[target] = le.fit_transform(df[target])
+        target_series = df[target]
+    else:
+        target_series = df[target]
+
+    # preprocess feature
+    if df[feature].dtype == object:
+        one_hot_encoder = preprocessing.OneHotEncoder()
+        sparse_matrix = one_hot_encoder.fit_transform(df[feature].values.reshape(-1, 1))
+        feature_df = sparse_matrix
+    else:
+        # reshaping needed because there is only 1 feature
+        feature_df = df[feature].values.reshape(-1, 1)
+
+    scores = cross_val_score(
+        model, feature_df, target_series, cv=CV_ITERATIONS, scoring=metric
+    )
+
+    # Crossvalidation is stratifiedKFold for classification, KFold for regression
+    return scores.mean()
+
+
+# %%
+
+# %%
+def _normalized_mae_score(model_mae, naive_mae):
+    # 10, 5 >> 0 because worse than naive
+    # 10, 20 >> 0.5
+    # 5, 20 >> 0.75 = 1 - mae/base_mae
+    if model_mae > naive_mae:
+        # maybe add warning?
+        return 0
+    else:
+        return 1 - (model_mae / naive_mae)
+
+
+# %%
+def _mae_normalizer(df, y, model_score):
+    df["naive"] = df[y].mean()
+    baseline_score = mean_absolute_error(df[y], df["naive"])  # true, pred
+
+    ppscore = _normalized_mae_score(abs(model_score), baseline_score)
+    return ppscore, baseline_score
+
+
+# %%
+def _normalized_f1_score(model_f1, baseline_f1):
+    ## F1 ranges from 0 to 1
+    ## 1 is best
+    # 0.5, 0.7 = 0 because worse than naive
+    # 0.75, 0.5 > 0.5
+    #
+    if model_f1 < baseline_f1:
+        return 0
+    else:
+        scale_range = 1.0 - baseline_f1  # eg 0.3
+        f1_diff = model_f1 - baseline_f1  # eg 0.1
+        return f1_diff / scale_range  # 0.1/0.3 = 0.33
+
+
+# %%
+def _f1_normalizer(df, y, model_score):
+    df["naive"] = df[y].value_counts().index[0]
+    baseline_score = f1_score(df[y], df["naive"], average="weighted")
+
+    ppscore = _normalized_f1_score(model_score, baseline_score)
+    return ppscore, baseline_score
+
+
+# %%
+TASKS = {
+    "regression": {
+        "metric_name": "mean absolute error",
+        "metric_key": "neg_mean_absolute_error",
+        "model": tree.DecisionTreeRegressor(),
+        "score_normalizer": _mae_normalizer,
+    },
+    "classification": {
+        "metric_name": "weighted F1",
+        "metric_key": "f1_weighted",
+        "model": tree.DecisionTreeClassifier(),
+        "score_normalizer": _f1_normalizer,
+    },
+    "predict_itself": {
+        "metric_name": None,
+        "metric_key": None,
+        "model": None,
+        "score_normalizer": None,
+    },
+    "predict_constant": {
+        "metric_name": None,
+        "metric_key": None,
+        "model": None,
+        "score_normalizer": None,
+    },
+    "predict_id": {
+        "metric_name": None,
+        "metric_key": None,
+        "model": None,
+        "score_normalizer": None,
+    },
+}
+
+
+# %%
+def _infer_task(df, x, y):
+    if x == y:
+        return "predict_itself"
+
+    category_count = df[y].value_counts().count()
+    if category_count == 0:
+        raise Exception(f"The target column {y} does not have valid values.")
+    if category_count == 1:
+        return "predict_constant"
+    if category_count == 2:
+        return "classification"
+    if category_count == len(df[y]) and (
+        is_string_dtype(df[y]) or is_categorical_dtype(df[y])
+    ):
+        return "predict_id"
+    if category_count <= NUMERIC_AS_CATEGORIC_BREAKPOINT and is_numeric_dtype(df[y]):
+        return "classification"
+
+    if is_bool_dtype(df[y]) or is_string_dtype(df[y]) or is_categorical_dtype(df[y]):
+        return "classification"
+
+    if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
+        raise Exception(
+            f"The target column {y} has the dtype {df[y].dtype} which is not supported. A possible solution might be to convert {y} to a string column"
+        )
+
+    # this check needs to be after is_bool_dtype because bool is considered numeric by pandas
+    if is_numeric_dtype(df[y]):
+        return "regression"
+
+    raise Exception(
+        f"Could not infer a valid task based on the target {y}. The dtype {df[y].dtype} is not yet supported"
+    )
+
+
+# %%
+def _feature_is_id(df, x):
+    if not (is_string_dtype(df[x]) or is_categorical_dtype(df[x])):
+        return False
+
+    category_count = df[x].value_counts().count()
+    return category_count == len(df[x])
+
+
+# %%
+def _maybe_sample(df, sample):
+    if sample and len(df) > sample:
+        # this is a problem if x or y have more than sample=5000 categories
+        # TODO: dont sample when the problem occurs and show warning
+        df = df.sample(sample, random_state=RANDOM_SEED, replace=False)
+    return df
+
+
+# %%
+def score(df, x, y, task=None, sample=5000):
+    # TODO: log.warning when values have been dropped
+    df = df[[x, y]].dropna()
+    df = _maybe_sample(df, sample)
+
+    if task is not None:
+        task_name = task
+    else:
+        task_name = _infer_task(df, x, y)
+
+    task = TASKS[task_name]
+
+    if task_name in ["predict_constant", "predict_itself"]:
+        model_score = 1
+        ppscore = 1
+        baseline_score = 1
+    elif task_name == "predict_id":
+        model_score = 0
+        ppscore = 0
+        baseline_score = 0
+    elif _feature_is_id(df, x):
+        model_score = 0
+        ppscore = 0
+        baseline_score = 0
+    else:
+        model_score = _calculate_model_cv_score_(
+            df, target=y, feature=x, metric=task["metric_key"], model=task["model"]
+        )
+        ppscore, baseline_score = task["score_normalizer"](df, y, model_score)
+
+    return {
+        "x": x,
+        "y": y,
+        "task": task_name,
+        "ppscore": ppscore,
+        "metric": task["metric_name"],
+        "baseline_score": baseline_score,
+        "model_score": abs(model_score),  # sklearn returns negative mae
+        "model": task["model"],
+    }
+
+
+# %%
+# def predictors(df, y, task=None, sorted=True):
+#    pass
+
+# %%
+def matrix(df, output="df", **kwargs):
+    data = {}
+    columns = list(df.columns)
+
+    for target in columns:
+        scores = []
+        for feature in columns:
+            # single_score = score(df, x=feature, y=target)["ppscore"]
+            try:
+                single_score = score(df, x=feature, y=target, **kwargs)["ppscore"]
+            except:
+                # TODO: log error
+                single_score = 0
+            scores.append(single_score)
+        data[target] = scores
+
+    if output == "df":
+        matrix = pd.DataFrame.from_dict(data, orient="index")
+        matrix.columns = columns
+        return matrix
+    else:
+        return data
+
+
+# %%
+# matrix(df)
+
+# %%
