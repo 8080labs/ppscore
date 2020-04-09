@@ -1,4 +1,3 @@
-# %%
 from sklearn import tree
 from sklearn import preprocessing
 from sklearn.model_selection import cross_val_score
@@ -30,7 +29,6 @@ RANDOM_SEED = 587136
 NUMERIC_AS_CATEGORIC_BREAKPOINT = 15
 
 
-# %%
 # https://scikit-learn.org/stable/modules/tree.html
 
 # https://scikit-learn.org/stable/modules/cross_validation.html
@@ -60,29 +58,24 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
         # reshaping needed because there is only 1 feature
         feature_df = df[feature].values.reshape(-1, 1)
 
+    # Crossvalidation is stratifiedKFold for classification, KFold for regression
     scores = cross_val_score(
         model, feature_df, target_series, cv=CV_ITERATIONS, scoring=metric
     )
 
-    # Crossvalidation is stratifiedKFold for classification, KFold for regression
     return scores.mean()
 
 
-# %%
-
-# %%
 def _normalized_mae_score(model_mae, naive_mae):
     # 10, 5 >> 0 because worse than naive
     # 10, 20 >> 0.5
     # 5, 20 >> 0.75 = 1 - mae/base_mae
     if model_mae > naive_mae:
-        # maybe add warning?
         return 0
     else:
         return 1 - (model_mae / naive_mae)
 
 
-# %%
 def _mae_normalizer(df, y, model_score):
     df["naive"] = df[y].mean()
     baseline_score = mean_absolute_error(df[y], df["naive"])  # true, pred
@@ -91,7 +84,6 @@ def _mae_normalizer(df, y, model_score):
     return ppscore, baseline_score
 
 
-# %%
 def _normalized_f1_score(model_f1, baseline_f1):
     ## F1 ranges from 0 to 1
     ## 1 is best
@@ -106,7 +98,6 @@ def _normalized_f1_score(model_f1, baseline_f1):
         return f1_diff / scale_range  # 0.1/0.3 = 0.33
 
 
-# %%
 def _f1_normalizer(df, y, model_score):
     df["naive"] = df[y].value_counts().index[0]
     baseline_score = f1_score(df[y], df["naive"], average="weighted")
@@ -115,7 +106,6 @@ def _f1_normalizer(df, y, model_score):
     return ppscore, baseline_score
 
 
-# %%
 TASKS = {
     "regression": {
         "metric_name": "mean absolute error",
@@ -150,14 +140,11 @@ TASKS = {
 }
 
 
-# %%
 def _infer_task(df, x, y):
     if x == y:
         return "predict_itself"
 
     category_count = df[y].value_counts().count()
-    if category_count == 0:
-        raise Exception(f"The target column {y} does not have valid values.")
     if category_count == 1:
         return "predict_constant"
     if category_count == 2:
@@ -183,10 +170,9 @@ def _infer_task(df, x, y):
 
     raise Exception(
         f"Could not infer a valid task based on the target {y}. The dtype {df[y].dtype} is not yet supported"
-    )
+    )  # pragma: no cover
 
 
-# %%
 def _feature_is_id(df, x):
     if not (is_string_dtype(df[x]) or is_categorical_dtype(df[x])):
         return False
@@ -195,7 +181,6 @@ def _feature_is_id(df, x):
     return category_count == len(df[x])
 
 
-# %%
 def _maybe_sample(df, sample):
     if sample and len(df) > sample:
         # this is a problem if x or y have more than sample=5000 categories
@@ -204,16 +189,17 @@ def _maybe_sample(df, sample):
     return df
 
 
-# %%
 def score(df, x, y, task=None, sample=5000):
     # TODO: log.warning when values have been dropped
     df = df[[x, y]].dropna()
+    if len(df) == 0:
+        raise Exception("After dropping missing values, there are no valid rows left")
     df = _maybe_sample(df, sample)
 
-    if task is not None:
-        task_name = task
-    else:
+    if task is None:
         task_name = _infer_task(df, x, y)
+    else:
+        task_name = task
 
     task = TASKS[task_name]
 
@@ -221,7 +207,7 @@ def score(df, x, y, task=None, sample=5000):
         model_score = 1
         ppscore = 1
         baseline_score = 1
-    elif task_name == "predict_id":
+    elif task_name == "predict_id":  # target is id
         model_score = 0
         ppscore = 0
         baseline_score = 0
@@ -247,11 +233,10 @@ def score(df, x, y, task=None, sample=5000):
     }
 
 
-# %%
 # def predictors(df, y, task=None, sorted=True):
 #    pass
 
-# %%
+
 def matrix(df, output="df", **kwargs):
     data = {}
     columns = list(df.columns)
@@ -272,11 +257,5 @@ def matrix(df, output="df", **kwargs):
         matrix = pd.DataFrame.from_dict(data, orient="index")
         matrix.columns = columns
         return matrix
-    else:
+    else:  # output == "dict"
         return data
-
-
-# %%
-# matrix(df)
-
-# %%
