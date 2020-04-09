@@ -29,11 +29,13 @@ RANDOM_SEED = 587136
 NUMERIC_AS_CATEGORIC_BREAKPOINT = 15
 
 
-# https://scikit-learn.org/stable/modules/tree.html
-
-# https://scikit-learn.org/stable/modules/cross_validation.html
-# https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
 def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
+    "Calculates the mean model score based on cross-validation"
+    # Sources about the used methods:
+    # https://scikit-learn.org/stable/modules/tree.html
+    # https://scikit-learn.org/stable/modules/cross_validation.html
+    # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
+
     # shuffle the rows - this is important for crossvalidation
     # because the crossvalidation just takes the first n lines
     # if there is a strong pattern in the rows eg 0,0,0,0,1,1,1,1
@@ -67,9 +69,11 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
 
 
 def _normalized_mae_score(model_mae, naive_mae):
+    "Normalizes the model MAE score, given the baseline score"
+    # # Value range of MAE is [0, infinity), 0 is best
     # 10, 5 >> 0 because worse than naive
     # 10, 20 >> 0.5
-    # 5, 20 >> 0.75 = 1 - mae/base_mae
+    # 5, 20 >> 0.75 = 1 - (mae/base_mae)
     if model_mae > naive_mae:
         return 0
     else:
@@ -77,6 +81,7 @@ def _normalized_mae_score(model_mae, naive_mae):
 
 
 def _mae_normalizer(df, y, model_score):
+    "In case of MAE, calculates the baseline score for y and derives the PPS."
     df["naive"] = df[y].mean()
     baseline_score = mean_absolute_error(df[y], df["naive"])  # true, pred
 
@@ -85,8 +90,9 @@ def _mae_normalizer(df, y, model_score):
 
 
 def _normalized_f1_score(model_f1, baseline_f1):
-    ## F1 ranges from 0 to 1
-    ## 1 is best
+    "Normalizes the model F1 score, given the baseline score"
+    # # F1 ranges from 0 to 1
+    # # 1 is best
     # 0.5, 0.7 = 0 because worse than naive
     # 0.75, 0.5 > 0.5
     #
@@ -99,6 +105,7 @@ def _normalized_f1_score(model_f1, baseline_f1):
 
 
 def _f1_normalizer(df, y, model_score):
+    "In case of F1, calculates the baseline score for y and derives the PPS."
     df["naive"] = df[y].value_counts().index[0]
     baseline_score = f1_score(df[y], df["naive"], average="weighted")
 
@@ -141,6 +148,7 @@ TASKS = {
 
 
 def _infer_task(df, x, y):
+    "Returns str with the name of the inferred task based on the columns x and y"
     if x == y:
         return "predict_itself"
 
@@ -174,6 +182,7 @@ def _infer_task(df, x, y):
 
 
 def _feature_is_id(df, x):
+    "Returns Boolean if the feature column x is an ID"
     if not (is_string_dtype(df[x]) or is_categorical_dtype(df[x])):
         return False
 
@@ -182,6 +191,23 @@ def _feature_is_id(df, x):
 
 
 def _maybe_sample(df, sample):
+    """
+    Maybe samples the rows of the given df to have at most ``sample`` rows
+    If sample is ``None`` or falsy, there will be no sampling.
+    If the df has fewer rows than the sample, there will be no sampling.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Dataframe that might be sampled
+    sample : int or ``None``
+        Number of rows to be sampled
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame after potential sampling
+    """
     if sample and len(df) > sample:
         # this is a problem if x or y have more than sample=5000 categories
         # TODO: dont sample when the problem occurs and show warning
@@ -190,6 +216,37 @@ def _maybe_sample(df, sample):
 
 
 def score(df, x, y, task=None, sample=5000):
+    """
+    Calculate the Predictive Power Score (PPS) for "x predicts y"
+    The score always ranges from 0 to 1 and is data-type agnostic.
+
+    A score of 0 means that the column x cannot predict the column y better than a naive baseline model.
+    A score of 1 means that the column x can perfectly predict the column y given the model.
+    A score between 0 and 1 states the ratio of how much potential predictive power the model achieved compared to the baseline model.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Dataframe that contains the columns x and y
+    x : str
+        Name of the column x which acts as the feature
+    y : str
+        Name of the column y which acts as the target
+    task : str, default ``None``
+        Name of the prediction task, e.g. ``classification`` or ``regression```
+        If the task is not specified, it is infered based on the y column
+        The task determines which model and evaluation score is used for the PPS
+    sample : int or ``None``
+        Number of rows for sampling. The sampling decreases the calculation time of the PPS.
+        If ``None`` there will be no sampling.
+
+    Returns
+    -------
+    Dict
+        A dict that contains multiple fields about the resulting PPS.
+        The dict enables introspection into the calculations that have been performed under the hood
+    """
+
     # TODO: log.warning when values have been dropped
     df = df[[x, y]].dropna()
     if len(df) == 0:
@@ -238,6 +295,23 @@ def score(df, x, y, task=None, sample=5000):
 
 
 def matrix(df, output="df", **kwargs):
+    """
+    Calculate the Predictive Power Score (PPS) matrix for all columns in the dataframe
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The dataframe that contains the data
+    output: str - potential values: "df", "dict"
+        Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the target column
+    kwargs:
+        Other key-word arguments that shall be forwarded to the pps.score method
+
+    Returns
+    -------
+    pandas.DataFrame or Dict
+        Either returns a df or a dict with all the PPS dicts arranged by the target column. This can be influenced by the output argument
+    """
     data = {}
     columns = list(df.columns)
 
