@@ -13,7 +13,7 @@ from pandas.api.types import (
     is_timedelta64_dtype,
 )
 
-# if the number is 4, then it is possible to detect patterns when there are at least 4 times the same x observation. If the limit is increased, the minimum observations also increase. This is important, because this is the limit when sklearn will throw an error which will lead to a score of 0 if we catch it
+# if the number is 4, then it is possible to detect patterns when there are at least 4 times the same observation. If the limit is increased, the minimum observations also increase. This is important, because this is the limit when sklearn will throw an error which will lead to a score of 0 if we catch it
 CV_ITERATIONS = 4
 
 RANDOM_SEED = 587136
@@ -22,7 +22,7 @@ RANDOM_SEED = 587136
 # thus, the ppscore will use a classification
 # this has important implications on the ppscore
 # eg if you have 4 equal categories encoded 0, 1, 2, 3 and treat it as a regression
-# then the baseline is 1.5 which is quite good and a predictor will have a harder time
+# then the baseline is 1 (median) which is okayish and a predictor will have a harder time
 # to beat the baseline, thus the ppscore will be considerably lower
 # if the column is encoded as category, then the baseline will be to always predict 0
 # this baseline will be way easier to beat and thus result in a higher ppscore
