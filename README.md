@@ -5,8 +5,13 @@
 
 <!-- __If you don't know what the Predictive Power Score is, please read the following blog post: [RIP correlation. Introducing the Predictive Power Score](https://bamboolib.com)__ -->
 
-The PPS is an asymmetric, data-type-agnostic score for predictive relationships between two columns that ranges from 0 to 1.
+The PPS is an asymmetric, data-type-agnostic score that can detect linear or non-linear relationships between two columns. The score ranges from 0 (no predictive power) to 1 (perfect predictive power).
 
+- [Installation](#installation)
+- [Getting started](#getting-started)
+- [API](#api)
+- [Calculation of the PPS](#calculation-of-the-pps)
+- [About](#about)
 
 ## Installation
 
