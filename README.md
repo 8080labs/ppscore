@@ -53,6 +53,14 @@ Here is how we can calculate the PPS matrix between all columns:
 pps.matrix(df)
 ```
 
+For the visualization of the PPS matrix you might want to use seaborn or your favorite viz library:
+
+```python
+import seaborn as sns
+df_matrix = pps.matrix(df)
+sns.heatmap(df_matrix, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
+```
+
 
 ## API
 
