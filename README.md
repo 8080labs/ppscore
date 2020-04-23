@@ -86,7 +86,7 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
 - __y__ : str
     - Name of the column y which acts as the target
 - __task__ : str, default ``None``
-    - Name of the prediction task, e.g. ``classification`` or ``regression```
+    - Name of the prediction task, e.g. ``classification`` or ``regression``
     If the task is not specified, it is infered based on the y column
     The task determines which model and evaluation score is used for the PPS
 - __sample__ : int or ``None``
