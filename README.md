@@ -126,9 +126,9 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 There are multiple ways how you can calculate the PPS. The ppscore package provides a sample implementation that is based on the following calculations:
 
 - The score is calculated using only 1 feature trying to predict the target column. This means there are no interaction effects between the scores of various features. Note that this is in contrast to feature importance
-- The score is calculated on the test sets of a 4-fold crossvalidation (number is adjustable via `ppscore.CV_ITERATIONS`)
+- The score is calculated on the test sets of a 4-fold crossvalidation (number is adjustable via `ppscore.CV_ITERATIONS`). For classification, stratifiedKFold is used. For regression, normal KFold. Please note that this sampling might not be valid for time series data sets
 - All rows which have a missing value in the feature or the target column are dropped
-- In case that the dataset has more than 5,000 rows the score is only calculated on a random subset of 5,000 rows with a fixed random seed (`ppscore.RANDOM_SEED`). You can adjust the number of rows or skip this sampling via the API. However, in most scenarios the results will be very similar.
+- In case that the dataset has more than 5,000 rows the score is only calculated on a random subset of 5,000 rows with a fixed random seed (`ppscore.RANDOM_SEED`). You can adjust the number of rows or skip this sampling via the API. However, in most scenarios the results will be very similar
 - There is no grid search for optimal model parameters
 
 
@@ -165,7 +165,7 @@ Even though the Decision Tree is a very flexible learning algorithm, we need to 
 
 ### Inference of the prediction task
 
-The choice of the task (classification or regression) has an influence on the final PPS and thus it is important how the task is chosen. If you calculate a single score, you can pass in a specific task. If you do not specify the task, the task is inferred as follows.
+The choice of the task (classification or regression) has an influence on the final PPS and thus it is important how the task is chosen. If you calculate a single score, you can specify the task via the API. If you do not specify the task, the task is inferred as follows.
 
 A __classification__ is inferred if one of the following conditions meet:
 - the target has the dtype `object` or `categorical`
