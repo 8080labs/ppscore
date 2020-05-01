@@ -247,16 +247,19 @@ def score(df, x, y, task=None, sample=5000):
         The dict enables introspection into the calculations that have been performed under the hood
     """
 
-    # TODO: log.warning when values have been dropped
-    df = df[[x, y]].dropna()
-    if len(df) == 0:
-        raise Exception("After dropping missing values, there are no valid rows left")
-    df = _maybe_sample(df, sample)
-
-    if task is None:
-        task_name = _infer_task(df, x, y)
+    if x == y:
+        task_name = "predict_itself"
     else:
-        task_name = task
+        # TODO: log.warning when values have been dropped
+        df = df[[x, y]].dropna()
+        if len(df) == 0:
+            raise Exception("After dropping missing values, there are no valid rows left")
+        df = _maybe_sample(df, sample)
+
+        if task is None:
+            task_name = _infer_task(df, x, y)
+        else:
+            task_name = task
 
     task = TASKS[task_name]
 
