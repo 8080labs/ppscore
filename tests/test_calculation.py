@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 
 import ppscore as pps
+from sklearn.model_selection import KFold, StratifiedKFold, TimeSeriesSplit, ShuffleSplit
 
 
 def test__normalized_f1_score():
@@ -58,7 +59,12 @@ def test__maybe_sample():
     assert len(_maybe_sample(df, 10)) == 10
 
 
-def test_score():
+cv_list = [5, KFold(n_splits=4), StratifiedKFold(), TimeSeriesSplit(n_splits=5),
+           ShuffleSplit()]
+
+
+@pytest.mark.parametrize("cv", cv_list)
+def test_score_cv(cv):
     df = pd.DataFrame()
     df["x"] = np.random.uniform(-2, 2, 1_000)
     df["error"] = np.random.uniform(-0.5, 0.5, 1_000)
@@ -72,29 +78,33 @@ def test_score():
     df["x_greater_0"] = df["x_greater_0"].astype(str)
 
     df["nan"] = np.nan
+
+    # Set up some cross-validation (KFold Shuffled)
+    cv = KFold(n_splits=2, shuffle=True)
+
     with pytest.raises(Exception):
         pps.score(df, "nan", "y")
 
-    assert pps.score(df, "x", "y", "regression")["task"] == "regression"
+    assert pps.score(df, "x", "y", "regression", cv=cv)["task"] == "regression"
 
-    assert pps.score(df, "x", "constant")["task"] == "predict_constant"
-    assert pps.score(df, "x", "x")["task"] == "predict_itself"
-    assert pps.score(df, "x", "id")["task"] == "predict_id"
+    assert pps.score(df, "x", "constant", cv=cv)["task"] == "predict_constant"
+    assert pps.score(df, "x", "x", cv=cv)["task"] == "predict_itself"
+    assert pps.score(df, "x", "id", cv=cv)["task"] == "predict_id"
 
     # feature is id
-    assert pps.score(df, "id", "y")["ppscore"] == 0
+    assert pps.score(df, "id", "y", cv=cv)["ppscore"] == 0
 
     # numeric feature and target
-    assert pps.score(df, "x", "y")["ppscore"] > 0.5
-    assert pps.score(df, "y", "x")["ppscore"] < 0.05
+    assert pps.score(df, "x", "y", cv=cv)["ppscore"] > 0.5
+    assert pps.score(df, "y", "x", cv=cv)["ppscore"] < 0.05
 
     # object feature or target
     assert pps.score(df, "x", "x_greater_0")["ppscore"] > 0.6
     assert pps.score(df, "x_greater_0", "x")["ppscore"] < 0.6
 
-
-def test_matrix():
-    df = pd.read_csv("examples/titanic.csv")
+@pytest.mark.parametrize("cv", cv_list)
+def test_matrix(cv):
+    df = pd.read_csv("../examples/titanic.csv")
     df = df[["Age", "Survived"]]
 
     assert isinstance(pps.matrix(df), pd.DataFrame)
@@ -102,4 +112,4 @@ def test_matrix():
 
     # matrix catches single score errors under the hood
     df["Age_datetime"] = pd.to_datetime(df["Age"], infer_datetime_format=True)
-    assert pps.matrix(df[["Survived", "Age_datetime"]])["Survived"]["Age_datetime"] == 0
+    assert pps.matrix(df[["Survived", "Age_datetime"]],cv=cv)["Survived"]["Age_datetime"] == 0
