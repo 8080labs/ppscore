@@ -61,6 +61,7 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
         feature_df = df[feature].values.reshape(-1, 1)
 
     # Crossvalidation is stratifiedKFold for classification, KFold for regression
+    # CV on one core (n_job=1; default) has shown to be fastest
     scores = cross_val_score(
         model, feature_df, target_series, cv=CV_ITERATIONS, scoring=metric
     )
