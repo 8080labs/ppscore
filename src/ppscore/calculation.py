@@ -71,6 +71,8 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs)
     groups = kwargs.get('groups', None)
 
     # Run crossvalidation with the CV specified
+    # Crossvalidation is stratifiedKFold for classification, KFold for regression
+    # CV on one core (n_job=1; default) has shown to be fastest
     scores = cross_val_score(
         pipeline_model, feature_df, target_series, cv=cv, scoring=metric,
         groups=groups
