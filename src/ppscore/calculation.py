@@ -298,7 +298,7 @@ def score(df, x, y, task=None, sample=5000):
 #    pass
 
 
-def matrix(df, output="df", **kwargs):
+def matrix(df, xs=None, ys=None, output="df", **kwargs):
     """
     Calculate the Predictive Power Score (PPS) matrix for all columns in the dataframe
 
@@ -306,6 +306,8 @@ def matrix(df, output="df", **kwargs):
     ----------
     df : pandas.DataFrame
         The dataframe that contains the data
+    xs: list - Column names which act as features. Defaults to all columns in df
+    ys: list - Column names which act as targets. Defaults to all columns in df
     output: str - potential values: "df", "dict"
         Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the target column
     kwargs:
@@ -319,9 +321,27 @@ def matrix(df, output="df", **kwargs):
     data = {}
     columns = list(df.columns)
 
-    for target in columns:
+    if xs is None:
+        features = columns
+    else:
+        # check for key errors before computing the score matrix
+        for i in xs:
+            if i not in columns:
+                raise KeyError(i)
+        features = xs
+
+    if ys is None:
+        targets = columns
+    else:
+        # check for key errors before computing the score matrix
+        for i in ys:
+            if i not in columns:
+                raise KeyError(i)
+        targets = ys
+
+    for target in targets:
         scores = []
-        for feature in columns:
+        for feature in features:
             # single_score = score(df, x=feature, y=target)["ppscore"]
             try:
                 single_score = score(df, x=feature, y=target, **kwargs)["ppscore"]
@@ -333,7 +353,7 @@ def matrix(df, output="df", **kwargs):
 
     if output == "df":
         matrix = pd.DataFrame.from_dict(data, orient="index")
-        matrix.columns = columns
+        matrix.columns = features
         return matrix
     else:  # output == "dict"
         return data

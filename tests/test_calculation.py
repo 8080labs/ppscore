@@ -103,3 +103,16 @@ def test_matrix():
     # matrix catches single score errors under the hood
     df["Age_datetime"] = pd.to_datetime(df["Age"], infer_datetime_format=True)
     assert pps.matrix(df[["Survived", "Age_datetime"]])["Survived"]["Age_datetime"] == 0
+
+    df = pd.read_csv("examples/titanic.csv")
+    df = df[["Age", "Sex", "Survived"]]
+
+    xs = ["Age", "Sex"]
+    ys = ["Survived"]
+
+    mat = pps.matrix(df, xs=xs, ys=ys)
+    # same values
+    assert mat["Age"]["Survived"] == pps.matrix(df[["Age", "Survived"]])["Age"]["Survived"]
+    # index and column names
+    assert all(i in mat.index for i in ys)
+    assert all(i in mat.columns for i in xs)
