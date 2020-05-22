@@ -287,6 +287,7 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         # Did not pass any CV - fallback to defaults:
         # Crossvalidation is stratifiedKFold for classification, KFold for regression
         cv = CV_ITERATIONS
+        # Shuffle data to imitate KFold(shuffle=True)
         df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     if x == y:
