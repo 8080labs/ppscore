@@ -11,4 +11,10 @@ finally:
     del get_distribution, DistributionNotFound
 
 
-from ppscore.calculation import score, matrix, CV_ITERATIONS, RANDOM_SEED, NUMERIC_AS_CATEGORIC_BREAKPOINT
+from ppscore.calculation import (
+    score,
+    matrix,
+    CV_ITERATIONS,
+    RANDOM_SEED,
+    NUMERIC_AS_CATEGORIC_BREAKPOINT,
+)

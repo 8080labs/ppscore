@@ -57,7 +57,9 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs)
     preprocess = None
     if df[feature].dtype == object:
         # Dealing with categorical feature here here:
-        preprocess = ColumnTransformer(transformers = [('ct',OneHotEncoder(),[feature])])
+        preprocess = ColumnTransformer(
+            transformers=[("ct", OneHotEncoder(), [feature])]
+        )
 
     # reshaping needed because there is only 1 feature: coerce to DataFrame
     feature_df = df[feature].to_frame()
@@ -68,14 +70,13 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs)
         pipeline_model = make_pipeline(preprocess, model)
 
     # Pull the groups out if passed
-    groups = kwargs.get('groups', None)
+    groups = kwargs.get("groups", None)
 
     # Run crossvalidation with the CV specified
     # Crossvalidation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
     scores = cross_val_score(
-        pipeline_model, feature_df, target_series, cv=cv, scoring=metric,
-        groups=groups
+        pipeline_model, feature_df, target_series, cv=cv, scoring=metric, groups=groups
     )
 
     return scores.mean()
@@ -101,11 +102,14 @@ def _mae_normalizer(df, y, model_score, cv, **kwargs):
     df["naive"] = df[y].median()
     # Re-write baseline score using DummyRegressor with median strategy
     baseline_regr = DummyRegressor(strategy="median")
-    groups = kwargs.get('groups', None)
+    groups = kwargs.get("groups", None)
     baseline_scores_cv = cross_val_score(
-        baseline_regr, df, df[y], cv=cv,
+        baseline_regr,
+        df,
+        df[y],
+        cv=cv,
         scoring="neg_mean_absolute_error",
-        groups=groups
+        groups=groups,
     )
     baseline_score = np.mean(np.abs(baseline_scores_cv))
 
@@ -131,11 +135,9 @@ def _normalized_f1_score(model_f1, baseline_f1):
 def _f1_normalizer(df, y, model_score, cv, **kwargs):
     """In case of F1, calculates the baseline score for y and derives the PPS."""
     baseline_clf = DummyClassifier(strategy="stratified")
-    groups = kwargs.get('groups', None)
+    groups = kwargs.get("groups", None)
     baseline_scores_cv = cross_val_score(
-        baseline_clf, df, df[y], cv=cv,
-        scoring="f1_weighted",
-        groups=groups
+        baseline_clf, df, df[y], cv=cv, scoring="f1_weighted", groups=groups
     )
     baseline_score = baseline_scores_cv.mean()
     ppscore = _normalized_f1_score(model_score, baseline_score)
@@ -187,7 +189,7 @@ def _infer_task(df, x, y):
     if category_count == 2:
         return "classification"
     if category_count == len(df[y]) and (
-            is_string_dtype(df[y]) or is_categorical_dtype(df[y])
+        is_string_dtype(df[y]) or is_categorical_dtype(df[y])
     ):
         return "predict_id"
     if category_count <= NUMERIC_AS_CATEGORIC_BREAKPOINT and is_numeric_dtype(df[y]):
@@ -269,7 +271,9 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         Number of rows for sampling. The sampling decreases the calculation time of the PPS.
         If ``None`` there will be no sampling.
     cv: iterable or sklearn-compatible cv object
-        Crossvalidation strategy to be used
+        Crossvalidation strategy to be used. if `None`, cv defaults to:
+         stratifiedKFold for classification, KFold for regression
+
 
     Returns
     -------
@@ -279,8 +283,11 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
     """
 
     if cv is None:
-        # Did not pass any CV - fallback to defaults
+
+        # Did not pass any CV - fallback to defaults:
+        # Crossvalidation is stratifiedKFold for classification, KFold for regression
         cv = CV_ITERATIONS
+        df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     if x == y:
         task_name = "predict_itself"
@@ -288,7 +295,9 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         # TODO: log.warning when values have been dropped
         df = df[[x, y]].dropna()
         if len(df) == 0:
-            raise Exception("After dropping missing values, there are no valid rows left")
+            raise Exception(
+                "After dropping missing values, there are no valid rows left"
+            )
         df = _maybe_sample(df, sample)
 
         if task is None:
@@ -312,10 +321,17 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         baseline_score = 0
     else:
         model_score = _calculate_model_cv_score_(
-            df, target=y, feature=x, metric=task["metric_key"], model=task["model"],
-            cv=cv, **kwargs
+            df,
+            target=y,
+            feature=x,
+            metric=task["metric_key"],
+            model=task["model"],
+            cv=cv,
+            **kwargs,
         )
-        ppscore, baseline_score = task["score_normalizer"](df, y, model_score, cv, **kwargs)
+        ppscore, baseline_score = task["score_normalizer"](
+            df, y, model_score, cv, **kwargs
+        )
 
     return {
         "x": x,

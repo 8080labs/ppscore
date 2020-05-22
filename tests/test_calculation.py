@@ -5,7 +5,12 @@ import pandas as pd
 import numpy as np
 
 import ppscore as pps
-from sklearn.model_selection import KFold, StratifiedKFold, TimeSeriesSplit, ShuffleSplit
+from sklearn.model_selection import (
+    KFold,
+    StratifiedKFold,
+    TimeSeriesSplit,
+    ShuffleSplit,
+)
 
 
 def test__normalized_f1_score():
@@ -59,8 +64,13 @@ def test__maybe_sample():
     assert len(_maybe_sample(df, 10)) == 10
 
 
-cv_list = [5, KFold(n_splits=4), StratifiedKFold(), TimeSeriesSplit(n_splits=5),
-           ShuffleSplit()]
+cv_list = [
+    5,
+    KFold(n_splits=4),
+    StratifiedKFold(),
+    TimeSeriesSplit(n_splits=5),
+    ShuffleSplit(),
+]
 
 
 @pytest.mark.parametrize("cv", cv_list)
@@ -102,6 +112,7 @@ def test_score_cv(cv):
     assert pps.score(df, "x", "x_greater_0")["ppscore"] > 0.6
     assert pps.score(df, "x_greater_0", "x")["ppscore"] < 0.6
 
+
 @pytest.mark.parametrize("cv", cv_list)
 def test_matrix(cv):
     df = pd.read_csv("../examples/titanic.csv")
@@ -112,4 +123,7 @@ def test_matrix(cv):
 
     # matrix catches single score errors under the hood
     df["Age_datetime"] = pd.to_datetime(df["Age"], infer_datetime_format=True)
-    assert pps.matrix(df[["Survived", "Age_datetime"]],cv=cv)["Survived"]["Age_datetime"] == 0
+    assert (
+        pps.matrix(df[["Survived", "Age_datetime"]], cv=cv)["Survived"]["Age_datetime"]
+        == 0
+    )
