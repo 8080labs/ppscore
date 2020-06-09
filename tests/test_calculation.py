@@ -66,7 +66,7 @@ def test__maybe_sample():
 
 # StratifiedKFold doesn't work for regression. That's why we have an extra test case for
 # a classification problem below
-cv_list = [
+cv_regression_list = [
     5,
     KFold(n_splits=2, shuffle=True),
     TimeSeriesSplit(n_splits=5),
@@ -74,7 +74,7 @@ cv_list = [
 ]
 
 
-@pytest.mark.parametrize("cv", cv_list)
+@pytest.mark.parametrize("cv", cv_regression_list)
 def test_score_cv(cv):
     df = pd.DataFrame()
     df["x"] = np.random.uniform(-2, 2, 1_000)
@@ -113,16 +113,49 @@ def test_score_cv(cv):
 
 def test_score_cv_on_classification():
     df = pd.DataFrame()
-    df["x"] = np.random.uniform(-2, 2, 1_000)
-    df["error"] = np.random.uniform(-0.5, 0.5, 1_000)
+    df["x"] = np.random.uniform(-2, 2, 5_000)
+    df["error"] = np.random.uniform(-0.5, 0.5, 5_000)
     df["y"] = df["x"] + df["error"] > 0
 
-    cv = StratifiedKFold(n_splits=3)
+    cv = StratifiedKFold(n_splits=5)
 
     result_dict = pps.score(df, "x", "y", cv=cv)
     assert result_dict["task"] == "classification"
     assert result_dict["ppscore"] > 0.8
 
+
+cv_list = [
+    5,
+    KFold(n_splits=2, shuffle=True),
+    StratifiedKFold(n_splits=3),
+    TimeSeriesSplit(n_splits=5),
+    ShuffleSplit(),
+]
+
+@pytest.mark.parametrize("cv", cv_list)
+def test_score_cv_stable(cv):
+    df = pd.DataFrame()
+    df["x"] = np.random.uniform(-2, 2, 1_000)
+    df["error"] = np.random.uniform(-0.5, 0.5, 1_000)
+    df["y_binary"] = df["x"] + df["error"] > 0
+    df["y_numeric"] = df["x"] ** 2 + df["error"]
+
+    def compute_ppscore(target, df=df, x="x", cv=cv):
+        return pps.score(df=df, x=x, y=target, cv=cv)["ppscore"]
+
+    # classification
+    result_1 = compute_ppscore(target="y_binary")
+    result_2 = compute_ppscore(target="y_binary")
+    assert abs(result_1 - result_2) < 0.05
+
+    # regression
+    # StratifiedKFold doesn't work for regression.
+    if isinstance(cv, StratifiedKFold):
+        return
+    else:
+        result_1 = compute_ppscore(target="y_numeric")
+        result_2 = compute_ppscore(target="y_numeric")
+        assert abs(result_1 - result_2) < 0.05
 
 
 @pytest.mark.parametrize("cv", cv_list)
