@@ -298,7 +298,8 @@ def score(df, x, y, task=None, sample=5000):
 
 def predictors(df, y, output="df", sorted=True, **kwargs):
     """
-    Calculate the Predictive Power Score (PPS) of all the features in the dataframe against a target column
+    Calculate the Predictive Power Score (PPS) of all the features in the dataframe
+    against a target column
 
     Parameters
     ----------
@@ -307,7 +308,8 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
     y : str
         Name of the column y which acts as the target
     output: str - potential values: "df", "list"
-        Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the feature columns in df
+        Control the type of the output. Either return a df or a dict with all the
+        PPS dicts arranged by the feature columns in df
     sorted: bool
         Whether or not to sort the output dataframe
     kwargs:
@@ -316,7 +318,8 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
     Returns
     -------
     pandas.DataFrame or list of Dict
-        Either returns a df or a list of all the PPS dicts. This can be influenced by the output argument
+        Either returns a df or a list of all the PPS dicts. This can be influenced
+        by the output argument
     """
     scores = [score(df, column, y, **kwargs) for column in df]
 
