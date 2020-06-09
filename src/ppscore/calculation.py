@@ -283,12 +283,11 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
     """
 
     if cv is None:
-
         # Did not pass any CV - fallback to defaults:
         # Crossvalidation is stratifiedKFold for classification, KFold for regression
         cv = CV_ITERATIONS
 
-    if isinstance(cv,int):
+    if isinstance(cv, int):
         # We either passed an integer for CV, or None and got cv set to an integer value of CV_ITERATIONS above
         # Shuffle data to imitate KFold(shuffle=True)
         df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
