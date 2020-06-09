@@ -1,4 +1,4 @@
-# # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 import pytest
 import pandas as pd
@@ -67,7 +67,7 @@ def test__maybe_sample():
 cv_list = [
     5,
     KFold(n_splits=4),
-    StratifiedKFold(),
+    StratifiedKFold(n_splits=3),  # used to disable warning
     TimeSeriesSplit(n_splits=5),
     ShuffleSplit(),
 ]
@@ -115,7 +115,7 @@ def test_score_cv(cv):
 
 @pytest.mark.parametrize("cv", cv_list)
 def test_matrix(cv):
-    df = pd.read_csv("../examples/titanic.csv")
+    df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", "Survived"]]
 
     assert isinstance(pps.matrix(df), pd.DataFrame)
