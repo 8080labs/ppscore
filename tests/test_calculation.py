@@ -64,7 +64,8 @@ def test__maybe_sample():
     assert len(_maybe_sample(df, 10)) == 10
 
 
-# StratifiedKFold doesn't work for regression. Have an extra test case for that
+# StratifiedKFold doesn't work for regression. That's why we have an extra test case for
+# a classification problem below
 cv_list = [
     5,
     KFold(n_splits=2, shuffle=True),
