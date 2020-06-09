@@ -64,10 +64,10 @@ def test__maybe_sample():
     assert len(_maybe_sample(df, 10)) == 10
 
 
+# StratifiedKFold doesn't work for regression. Have an extra test case for that
 cv_list = [
     5,
-    KFold(n_splits=4),
-    StratifiedKFold(n_splits=3),  # used to disable warning
+    KFold(n_splits=2, shuffle=True),
     TimeSeriesSplit(n_splits=5),
     ShuffleSplit(),
 ]
@@ -89,9 +89,6 @@ def test_score_cv(cv):
 
     df["nan"] = np.nan
 
-    # Set up some cross-validation (KFold Shuffled)
-    cv = KFold(n_splits=2, shuffle=True)
-
     with pytest.raises(Exception):
         pps.score(df, "nan", "y")
 
@@ -111,6 +108,20 @@ def test_score_cv(cv):
     # object feature or target
     assert pps.score(df, "x", "x_greater_0")["ppscore"] > 0.6
     assert pps.score(df, "x_greater_0", "x")["ppscore"] < 0.6
+
+
+def test_score_cv_on_classification():
+    df = pd.DataFrame()
+    df["x"] = np.random.uniform(-2, 2, 1_000)
+    df["error"] = np.random.uniform(-0.5, 0.5, 1_000)
+    df["y"] = df["x"] + df["error"] > 0
+
+    cv = StratifiedKFold(n_splits=3)
+
+    result_dict = pps.score(df, "x", "y", cv=cv)
+    assert result_dict["task"] == "classification"
+    assert result_dict["ppscore"] > 0.8
+
 
 
 @pytest.mark.parametrize("cv", cv_list)
