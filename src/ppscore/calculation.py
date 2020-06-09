@@ -254,7 +254,9 @@ def score(df, x, y, task=None, sample=5000):
         # TODO: log.warning when values have been dropped
         df = df[[x, y]].dropna()
         if len(df) == 0:
-            raise Exception("After dropping missing values, there are no valid rows left")
+            raise Exception(
+                "After dropping missing values, there are no valid rows left"
+            )
         df = _maybe_sample(df, sample)
 
         if task is None:
@@ -321,9 +323,9 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
     if sorted:
         scores.sort(key=lambda item: item["ppscore"], reverse=True)
 
-    if output == 'df':
-        scores = {score['x']: score['ppscore'] for score in scores}
-        scores = pd.DataFrame.from_dict(scores, orient="index", columns=['ppscore'])
+    if output == "df":
+        scores = {score["x"]: score["ppscore"] for score in scores}
+        scores = pd.DataFrame.from_dict(scores, orient="index", columns=["ppscore"])
 
     return scores
 
