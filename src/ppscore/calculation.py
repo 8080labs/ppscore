@@ -321,7 +321,7 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Either returns a df or a list of all the PPS dicts. This can be influenced
         by the output argument
     """
-    scores = [score(df, column, y, **kwargs) for column in df]
+    scores = [score(df, column, y, **kwargs) for column in df if column != y]
 
     if sorted:
         scores.sort(key=lambda item: item["ppscore"], reverse=True)
