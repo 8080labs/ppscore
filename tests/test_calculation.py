@@ -94,10 +94,13 @@ def test_score():
 
 
 def test_predictors():
+    y = "Survived"
     df = pd.read_csv("examples/titanic.csv")
-    df = df[["Age", "Survived"]]
+    df = df[["Age", y]]
 
-    assert isinstance(pps.predictors(df, 'Survived'), pd.DataFrame)
+    result_df = pps.predictors(df, y)
+    assert isinstance(result_df, pd.DataFrame)
+    assert not y in result_df.index
     assert isinstance(pps.predictors(df, 'Survived', output="list"), list)
     assert isinstance(pps.predictors(df, 'Survived', output="list")[0], dict)  # return scores dict
 
