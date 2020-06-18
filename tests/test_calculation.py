@@ -93,6 +93,18 @@ def test_score():
     assert pps.score(df, "x_greater_0", "x")["ppscore"] < 0.6
 
 
+def test_predictors():
+    y = "Survived"
+    df = pd.read_csv("examples/titanic.csv")
+    df = df[["Age", y]]
+
+    result_df = pps.predictors(df, y)
+    assert isinstance(result_df, pd.DataFrame)
+    assert not y in result_df.index
+    assert isinstance(pps.predictors(df, 'Survived', output="list"), list)
+    assert isinstance(pps.predictors(df, 'Survived', output="list")[0], dict)  # return scores dict
+
+
 def test_matrix():
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", "Survived"]]
