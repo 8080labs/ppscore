@@ -122,11 +122,11 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
 #### Parameters
 - __df__ : pandas.DataFrame
     - The dataframe that contains the data
-- y : str
+- __y__ : str
     - Name of the column y which acts as the target
 - __output__ : str - potential values: "df", "list"
     - Control the type of the output. Either return a df or a list with all the PPS score dicts
-- sorted : bool
+- __sorted__ : bool
     - Whether or not to sort the output dataframe/list
 - __kwargs__ :
     - Other key-word arguments that shall be forwarded to the pps.score method
