@@ -254,7 +254,9 @@ def score(df, x, y, task=None, sample=5000):
         # TODO: log.warning when values have been dropped
         df = df[[x, y]].dropna()
         if len(df) == 0:
-            raise Exception("After dropping missing values, there are no valid rows left")
+            raise Exception(
+                "After dropping missing values, there are no valid rows left"
+            )
         df = _maybe_sample(df, sample)
 
         if task is None:
@@ -294,8 +296,41 @@ def score(df, x, y, task=None, sample=5000):
     }
 
 
-# def predictors(df, y, task=None, sorted=True):
-#    pass
+def predictors(df, y, output="df", sorted=True, **kwargs):
+    """
+    Calculate the Predictive Power Score (PPS) of all the features in the dataframe
+    against a target column
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The dataframe that contains the data
+    y : str
+        Name of the column y which acts as the target
+    output: str - potential values: "df", "list"
+        Control the type of the output. Either return a df or a dict with all the
+        PPS dicts arranged by the feature columns in df
+    sorted: bool
+        Whether or not to sort the output dataframe
+    kwargs:
+        Other key-word arguments that shall be forwarded to the pps.score method
+
+    Returns
+    -------
+    pandas.DataFrame or list of Dict
+        Either returns a df or a list of all the PPS dicts. This can be influenced
+        by the output argument
+    """
+    scores = [score(df, column, y, **kwargs) for column in df if column != y]
+
+    if sorted:
+        scores.sort(key=lambda item: item["ppscore"], reverse=True)
+
+    if output == "df":
+        scores = {score["x"]: score["ppscore"] for score in scores}
+        scores = pd.DataFrame.from_dict(scores, orient="index", columns=["ppscore"])
+
+    return scores
 
 
 def matrix(df, output="df", **kwargs):
