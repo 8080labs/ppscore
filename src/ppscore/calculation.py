@@ -311,7 +311,7 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Control the type of the output. Either return a df or a dict with all the
         PPS dicts arranged by the feature columns in df
     sorted: bool
-        Whether or not to sort the output dataframe
+        Whether or not to sort the output dataframe/list
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method
 
