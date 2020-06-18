@@ -327,8 +327,17 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         scores.sort(key=lambda item: item["ppscore"], reverse=True)
 
     if output == "df":
-        scores = {score["x"]: score["ppscore"] for score in scores}
-        scores = pd.DataFrame.from_dict(scores, orient="index", columns=["ppscore"])
+        df_columns = [
+            "x",
+            "ppscore",
+            "y",
+            "task",
+            "metric",
+            "baseline_score",
+            "model_score",
+        ]
+        data = {column: [score[column] for score in scores] for column in df_columns}
+        scores = pd.DataFrame.from_dict(data)
 
     return scores
 

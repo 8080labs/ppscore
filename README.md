@@ -72,7 +72,7 @@ Similarly, we can also plot the predictors
 ```python
 import seaborn as sns
 df_predictors = pps.predictors(df, y="y")
-sns.barplot(data=df_predictors.reset_index(), x="index", y="ppscore")
+sns.barplot(data=df_predictors, x="x", y="ppscore")
 ```
 
 

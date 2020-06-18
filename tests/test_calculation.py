@@ -101,8 +101,10 @@ def test_predictors():
     result_df = pps.predictors(df, y)
     assert isinstance(result_df, pd.DataFrame)
     assert not y in result_df.index
-    assert isinstance(pps.predictors(df, 'Survived', output="list"), list)
-    assert isinstance(pps.predictors(df, 'Survived', output="list")[0], dict)  # return scores dict
+
+    list_of_dicts = pps.predictors(df, y, output="list")
+    assert isinstance(list_of_dicts, list)
+    assert isinstance(list_of_dicts[0], dict)
 
 
 def test_matrix():
