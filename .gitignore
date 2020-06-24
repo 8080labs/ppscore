@@ -49,3 +49,4 @@ MANIFEST
 .venv*/
 
 .DS_Store
+devstuff.py
