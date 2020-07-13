@@ -7,6 +7,7 @@ import pandas as pd
 from pandas.api.types import (
     is_numeric_dtype,
     is_bool_dtype,
+    is_object_dtype,
     is_categorical_dtype,
     is_string_dtype,
     is_datetime64_any_dtype,
@@ -44,26 +45,27 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
     df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     # preprocess target
-    if df[target].dtype == object:
-        le = preprocessing.LabelEncoder()
-        df[target] = le.fit_transform(df[target])
+    if dtype_represents_categories(df[target]):
+        label_encoder = preprocessing.LabelEncoder()
+        df[target] = label_encoder.fit_transform(df[target])
         target_series = df[target]
     else:
         target_series = df[target]
 
     # preprocess feature
-    if df[feature].dtype == object:
+    if dtype_represents_categories(df[feature]):
         one_hot_encoder = preprocessing.OneHotEncoder()
-        sparse_matrix = one_hot_encoder.fit_transform(df[feature].values.reshape(-1, 1))
-        feature_df = sparse_matrix
+        array = df[feature].__array__()
+        sparse_matrix = one_hot_encoder.fit_transform(array.reshape(-1, 1))
+        feature_input = sparse_matrix
     else:
         # reshaping needed because there is only 1 feature
-        feature_df = df[feature].values.reshape(-1, 1)
+        feature_input = df[feature].values.reshape(-1, 1)
 
     # Crossvalidation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
     scores = cross_val_score(
-        model, feature_df, target_series, cv=CV_ITERATIONS, scoring=metric
+        model, feature_input, target_series, cv=CV_ITERATIONS, scoring=metric
     )
 
     return scores.mean()
@@ -107,8 +109,15 @@ def _normalized_f1_score(model_f1, baseline_f1):
 
 def _f1_normalizer(df, y, model_score):
     "In case of F1, calculates the baseline score for y and derives the PPS."
-    df["naive"] = df[y].value_counts().index[0]
-    baseline_score = f1_score(df[y], df["naive"], average="weighted")
+    label_encoder = preprocessing.LabelEncoder()
+    df["truth"] = label_encoder.fit_transform(df[y])
+    df["most_common_value"] = df["truth"].value_counts().index[0]
+    random = df["truth"].sample(frac=1)
+
+    baseline_score = max(
+        f1_score(df["truth"], df["most_common_value"], average="weighted"),
+        f1_score(df["truth"], random, average="weighted"),
+    )
 
     ppscore = _normalized_f1_score(model_score, baseline_score)
     return ppscore, baseline_score
@@ -148,6 +157,16 @@ TASKS = {
 }
 
 
+def dtype_represents_categories(series) -> bool:
+    "Determines if the dtype of the series represents categorical values"
+    return (
+        is_bool_dtype(series)
+        or is_object_dtype(series)
+        or is_string_dtype(series)
+        or is_categorical_dtype(series)
+    )
+
+
 def _infer_task(df, x, y):
     "Returns str with the name of the inferred task based on the columns x and y"
     if x == y:
@@ -165,7 +184,7 @@ def _infer_task(df, x, y):
     if category_count <= NUMERIC_AS_CATEGORIC_BREAKPOINT and is_numeric_dtype(df[y]):
         return "classification"
 
-    if is_bool_dtype(df[y]) or is_string_dtype(df[y]) or is_categorical_dtype(df[y]):
+    if dtype_represents_categories(df[y]):
         return "classification"
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):

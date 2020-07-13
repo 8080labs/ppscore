@@ -68,8 +68,16 @@ def test_score():
     df = df.reset_index()
     df["id"] = df["index"].astype(str)
 
-    df["x_greater_0"] = df["x"] > 0
-    df["x_greater_0"] = df["x_greater_0"].astype(str)
+    df["x_greater_0_boolean"] = df["x"] > 0
+    # df["x_greater_0_string"] = df["x_greater_0_boolean"].astype(str)
+    df["x_greater_0_string"] = pd.Series(
+        df["x_greater_0_boolean"].apply(str), dtype="string"
+    )
+    df["x_greater_0_string_object"] = df["x_greater_0_string"].astype("object")
+    df["x_greater_0_string_category"] = df["x_greater_0_string"].astype("category")
+
+    df["x_greater_0_boolean_object"] = df["x_greater_0_boolean"].astype("object")
+    df["x_greater_0_boolean_category"] = df["x_greater_0_boolean"].astype("category")
 
     df["nan"] = np.nan
     with pytest.raises(Exception):
@@ -88,9 +96,29 @@ def test_score():
     assert pps.score(df, "x", "y")["ppscore"] > 0.5
     assert pps.score(df, "y", "x")["ppscore"] < 0.05
 
+    # boolean feature or target
+    assert pps.score(df, "x", "x_greater_0_boolean")["ppscore"] > 0.6
+    assert pps.score(df, "x_greater_0_boolean", "x")["ppscore"] < 0.6
+
+    # string feature or target
+    assert pps.score(df, "x", "x_greater_0_string")["ppscore"] > 0.6
+    assert pps.score(df, "x_greater_0_string", "x")["ppscore"] < 0.6
+
     # object feature or target
-    assert pps.score(df, "x", "x_greater_0")["ppscore"] > 0.6
-    assert pps.score(df, "x_greater_0", "x")["ppscore"] < 0.6
+    assert pps.score(df, "x", "x_greater_0_string_object")["ppscore"] > 0.6
+    assert pps.score(df, "x_greater_0_string_object", "x")["ppscore"] < 0.6
+
+    # category feature or target
+    assert pps.score(df, "x", "x_greater_0_string_category")["ppscore"] > 0.6
+    assert pps.score(df, "x_greater_0_string_category", "x")["ppscore"] < 0.6
+
+    # object feature or target
+    assert pps.score(df, "x", "x_greater_0_boolean_object")["ppscore"] > 0.6
+    assert pps.score(df, "x_greater_0_boolean_object", "x")["ppscore"] < 0.6
+
+    # category feature or target
+    assert pps.score(df, "x", "x_greater_0_boolean_category")["ppscore"] > 0.6
+    assert pps.score(df, "x_greater_0_boolean_category", "x")["ppscore"] < 0.6
 
 
 def test_predictors():

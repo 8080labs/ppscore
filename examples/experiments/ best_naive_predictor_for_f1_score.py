@@ -15,12 +15,14 @@ from sklearn.metrics import f1_score
 
 # %%
 df = pd.DataFrame(
-{
-    'boolean_equal': np.random.choice(['yes', 'no'],1000),
-    'boolean_skewed': np.random.choice(['yes', 'yes', 'yes', 'no'],1000),
-    'multicat_equal': np.random.choice(['cat1', 'cat2', 'cat3', 'cat4'],1000),
-    'multicat_skewed': np.random.choice(['cat1', 'cat1', 'cat1', 'cat1', 'cat2', 'cat2', 'cat3', 'cat4'],1000),
-}
+    {
+        "boolean_equal": np.random.choice(["yes", "no"], 1000),
+        "boolean_skewed": np.random.choice(["yes", "yes", "yes", "no"], 1000),
+        "multicat_equal": np.random.choice(["cat1", "cat2", "cat3", "cat4"], 1000),
+        "multicat_skewed": np.random.choice(
+            ["cat1", "cat1", "cat1", "cat1", "cat2", "cat2", "cat3", "cat4"], 1000
+        ),
+    }
 )
 
 
