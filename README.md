@@ -5,7 +5,7 @@
 
 __If you don't know yet what the Predictive Power Score is, please read the following blog post:__
 
-__[RIP correlation. Introducing the Predictive Power Score](https://bamboolib.com)__
+__[RIP correlation. Introducing the Predictive Power Score](https://towardsdatascience.com/rip-correlation-introducing-the-predictive-power-score-3d90808b9598)__
 
 The PPS is an asymmetric, data-type-agnostic score that can detect linear or non-linear relationships between two columns. The score ranges from 0 (no predictive power) to 1 (perfect predictive power). It can be used as an alternative to the correlation (matrix).
 
