@@ -45,7 +45,7 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
     df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     # preprocess target
-    if dtype_represents_categories(df[target]):
+    if _dtype_represents_categories(df[target]):
         label_encoder = preprocessing.LabelEncoder()
         df[target] = label_encoder.fit_transform(df[target])
         target_series = df[target]
@@ -53,7 +53,7 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
         target_series = df[target]
 
     # preprocess feature
-    if dtype_represents_categories(df[feature]):
+    if _dtype_represents_categories(df[feature]):
         one_hot_encoder = preprocessing.OneHotEncoder()
         array = df[feature].__array__()
         sparse_matrix = one_hot_encoder.fit_transform(array.reshape(-1, 1))
@@ -157,7 +157,7 @@ TASKS = {
 }
 
 
-def dtype_represents_categories(series) -> bool:
+def _dtype_represents_categories(series) -> bool:
     "Determines if the dtype of the series represents categorical values"
     return (
         is_bool_dtype(series)
@@ -184,7 +184,7 @@ def _infer_task(df, x, y):
     if category_count <= NUMERIC_AS_CATEGORIC_BREAKPOINT and is_numeric_dtype(df[y]):
         return "classification"
 
-    if dtype_represents_categories(df[y]):
+    if _dtype_represents_categories(df[y]):
         return "classification"
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
