@@ -195,7 +195,7 @@ However, please note why we actively decided against the following algorithms:
 
 ### Data preprocessing
 
-Even though the Decision Tree is a very flexible learning algorithm, we need to perform the following preprocessing steps if a column has the pandas dtype `object`.‌
+Even though the Decision Tree is a very flexible learning algorithm, we need to perform the following preprocessing steps if a column represents categoric values - that means it has the pandas dtype `object`, `category`, `string` or `boolean`.‌
 - If the target column is categoric, we use the sklearn.LabelEncoder​
 - If the feature column is categoric, we use the sklearn.OneHotEncoder​
 
@@ -205,7 +205,7 @@ Even though the Decision Tree is a very flexible learning algorithm, we need to 
 The choice of the task (classification or regression) has an influence on the final PPS and thus it is important how the task is chosen. If you calculate a single score, you can specify the task via the API. If you do not specify the task, the task is inferred as follows.
 
 A __classification__ is inferred if one of the following conditions meet:
-- the target has the dtype `object` or `categorical`
+- the target has the dtype `object`, `category`, `string` or `boolean`
 - the target only has two unique values
 - the target is numeric but has less than 15 unique values. This breakpoint can be overridden via the constant `ppscore.NUMERIC_AS_CATEGORIC_BREAKPOINT`
 
@@ -223,7 +223,7 @@ In case of an regression, the ppscore uses the mean absolute error (MAE) as the 
 
 #### Classification
 
-If the task is a classification, we compute the weighted F1 score (wF1) as the underlying evaluation metric (F1_model). The F1 score can be interpreted as a weighted average of the precision and recall, where an F1 score reaches its best value at 1 and worst score at 0. The relative contribution of precision and recall to the F1 score are equal. The weighted F1 takes into account the precision and recall of all classes weighted by their support as described [here](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html). As a baseline score, we calculate the weighted F1 score of a naive model (F1_naive) that always predicts the most common class of the target column. The PPS is the result of the following normalization (and never smaller than 0):
+If the task is a classification, we compute the weighted F1 score (wF1) as the underlying evaluation metric (F1_model). The F1 score can be interpreted as a weighted average of the precision and recall, where an F1 score reaches its best value at 1 and worst score at 0. The relative contribution of precision and recall to the F1 score are equal. The weighted F1 takes into account the precision and recall of all classes weighted by their support as described [here](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html). As a baseline score (F1_naive), we calculate the weighted F1 score for a model that always predicts the most common class of the target column (F1_most_common) and a model that predicts random values (F1_random). F1_naive is set to the maximum of F1_most_common and F1_random. The PPS is the result of the following normalization (and never smaller than 0):
 > PPS = (F1_model - F1_naive) / (1 - F1_naive)
 
 
