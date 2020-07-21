@@ -272,7 +272,7 @@ def score(df, x, y, task=None, sample=5000):
         )
     if task is not None:
         raise AttributeError(
-            "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\n"
+            "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
         )
 
     if x == y:

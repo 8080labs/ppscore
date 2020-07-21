@@ -81,7 +81,7 @@ sns.barplot(data=df_predictors, x="x", y="ppscore")
 
 ## API
 
-### ppscore.score(df, x, y, task=None, sample=5000)
+### ppscore.score(df, x, y, sample=5000)
 
 Calculate the Predictive Power Score (PPS) for "x predicts y"
 
@@ -102,10 +102,6 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
     - Name of the column x which acts as the feature
 - __y__ : str
     - Name of the column y which acts as the target
-- __task__ : str, default ``None``
-    - Name of the prediction task, e.g. ``classification`` or ``regression``.
-    If the task is not specified, it is infered based on the y column
-    The task determines which model and evaluation score is used for the PPS
 - __sample__ : int or ``None``
     - Number of rows for sampling. The sampling decreases the calculation time of the PPS.
     If ``None`` there will be no sampling.
@@ -131,7 +127,7 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
 - __sorted__ : bool
     - Whether or not to sort the output dataframe/list
 - __kwargs__ :
-    - Other key-word arguments that shall be forwarded to the pps.score method
+    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__
 
 #### Returns
 
@@ -150,7 +146,7 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 - __output__ : str - potential values: "df", "dict"
     - Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the target column
 - __kwargs__ :
-    - Other key-word arguments that shall be forwarded to the pps.score method
+    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__
 
 #### Returns
 
@@ -204,19 +200,23 @@ Even though the Decision Tree is a very flexible learning algorithm, we need to 
 
 ### Inference of the prediction task
 
-The choice of the task (classification or regression) has an influence on the final PPS and thus it is important how the task is chosen. If you calculate a single score, you can specify the task via the API. If you do not specify the task, the task is inferred as follows.
+> This logic was updated in version 1.0.0.
 
-A __classification__ is inferred if one of the following conditions meet:
-- the target has the dtype `object`, `category`, `string` or `boolean`
-- the target only has two unique values
-- the target is numeric but has less than 15 unique values. This breakpoint can be overridden via the constant `ppscore.NUMERIC_AS_CATEGORIC_BREAKPOINT`
+The choice of the task (classification or regression) has an influence on the final PPS and thus it is important that the correct task is chosen. The task is chosen based on the data types of the columns. That means, e.g. if you want to change the task from "regression" to "classification" that you have to change the data type from "float" to "string".
 
-Otherwise, the task is inferred as __regression__ if the dtype is numeric (float or integer).
+Here are the two main tasks:
+- A __classification__ is inferred if the target has the dtype `object`, `category`, `string` or `boolean`
+- A __regression__ is inferred if the target has the dtype `float` or `int`
+
+In addition, there are the following 3 special tasks which save considerable calculation time:
+- __predict_id__ means that the target column is categoric (see above for __classification__) and that all categories appear only once. Thus, the PPS is 0
+- __predict_constant__ means that the target column only has a single value and thus the PPS is 1
+- __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1
 
 
 ### Tasks and their score metrics​
 
-Based on the data type and cardinality of the target column, ppscore assumes either the task of a classification or regression. Each task uses a different evaluation score for calculating the final predictive power score (PPS).
+Each task uses a different evaluation score for calculating the final predictive power score (PPS).
 
 #### Regression
 
@@ -228,6 +228,12 @@ In case of an regression, the ppscore uses the mean absolute error (MAE) as the 
 If the task is a classification, we compute the weighted F1 score (wF1) as the underlying evaluation metric (F1_model). The F1 score can be interpreted as a weighted average of the precision and recall, where an F1 score reaches its best value at 1 and worst score at 0. The relative contribution of precision and recall to the F1 score are equal. The weighted F1 takes into account the precision and recall of all classes weighted by their support as described [here](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html). As a baseline score (F1_naive), we calculate the weighted F1 score for a model that always predicts the most common class of the target column (F1_most_common) and a model that predicts random values (F1_random). F1_naive is set to the maximum of F1_most_common and F1_random. The PPS is the result of the following normalization (and never smaller than 0):
 > PPS = (F1_model - F1_naive) / (1 - F1_naive)
 
+#### Special tasks
+
+The special tasks all have predefined PPS scores. Those tasks exist for implementation reasons in order to communicate special cases and save computation time.
+- __predict_id__ has a score of 0 because an ID column cannot be predicted by any other column as part of a crossvalidation. There still might be a 1 to 1 relationship but this is not detectable by the current implementation of the PPS.
+- __predict_constant__ has a score of 1 because any column and baseline can perfectly predict a column that only has a single value. It could be argued that the score should be 0 because the model is not better than the naive predictor. However, (so far) we chose to set a value of 1 in order to communicate that there is perfect predictive power.
+- __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1 because a column can always perfectly predict its own value.
 
 ## About
 ppscore is developed by [8080 Labs](https://8080labs.com) - we create tools for Python Data Scientists. If you like `ppscore`, please check out our other project [bamboolib](https://bamboolib.com)
