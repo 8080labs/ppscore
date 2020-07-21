@@ -30,13 +30,14 @@ RANDOM_SEED = 587136
 NUMERIC_AS_CATEGORIC_BREAKPOINT = 15
 
 
-def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
+def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
     # https://scikit-learn.org/stable/modules/tree.html
     # https://scikit-learn.org/stable/modules/cross_validation.html
     # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
-
+    metric = task["metric_key"]
+    model = task["model"]
     # shuffle the rows - this is important for crossvalidation
     # because the crossvalidation just takes the first n lines
     # if there is a strong pattern in the rows eg 0,0,0,0,1,1,1,1
@@ -45,7 +46,7 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, **kwargs):
     df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     # preprocess target
-    if _dtype_represents_categories(df[target]):
+    if task["type"] == "classification":
         label_encoder = preprocessing.LabelEncoder()
         df[target] = label_encoder.fit_transform(df[target])
         target_series = df[target]
@@ -125,30 +126,35 @@ def _f1_normalizer(df, y, model_score):
 
 TASKS = {
     "regression": {
+        "type": "regression",
         "metric_name": "mean absolute error",
         "metric_key": "neg_mean_absolute_error",
         "model": tree.DecisionTreeRegressor(),
         "score_normalizer": _mae_normalizer,
     },
     "classification": {
+        "type": "classification",
         "metric_name": "weighted F1",
         "metric_key": "f1_weighted",
         "model": tree.DecisionTreeClassifier(),
         "score_normalizer": _f1_normalizer,
     },
     "predict_itself": {
+        "type": "predict_itself",
         "metric_name": None,
         "metric_key": None,
         "model": None,
         "score_normalizer": None,
     },
     "predict_constant": {
+        "type": "predict_constant",
         "metric_name": None,
         "metric_key": None,
         "model": None,
         "score_normalizer": None,
     },
     "predict_id": {
+        "type": "predict_id",
         "metric_name": None,
         "metric_key": None,
         "model": None,
@@ -298,9 +304,8 @@ def score(df, x, y, task=None, sample=5000):
         ppscore = 0
         baseline_score = 0
     else:
-        model_score = _calculate_model_cv_score_(
-            df, target=y, feature=x, metric=task["metric_key"], model=task["model"]
-        )
+
+        model_score = _calculate_model_cv_score_(df, target=y, feature=x, task=task)
         ppscore, baseline_score = task["score_normalizer"](df, y, model_score)
 
     return {
