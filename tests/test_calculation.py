@@ -94,6 +94,16 @@ def test_score():
 
     df["nan"] = np.nan
 
+    duplicate_column_names_df = pd.DataFrame()
+    duplicate_column_names_df["x1"] = np.random.uniform(-2, 2, 10)
+    duplicate_column_names_df["x2"] = np.random.uniform(-2, 2, 10)
+    duplicate_column_names_df["unique_column_name"] = np.random.uniform(-2, 2, 10)
+    duplicate_column_names_df.columns = [
+        "duplicate_column_name",
+        "duplicate_column_name",
+        "unique_column_name",
+    ]
+
     # check input types
     with pytest.raises(TypeError):
         numpy_array = np.random.randn(10, 10)  # not a DataFrame
@@ -112,6 +122,18 @@ def test_score():
     with pytest.raises(AttributeError):
         # the task argument is not supported any more
         pps.score(df, "x", "y", task="classification")
+
+    with pytest.raises(AssertionError):
+        # df shall not have duplicate column names
+        pps.score(
+            duplicate_column_names_df, "duplicate_column_name", "unique_column_name"
+        )
+
+    with pytest.raises(AssertionError):
+        # df shall not have duplicate column names
+        pps.score(
+            duplicate_column_names_df, "unique_column_name", "duplicate_column_name"
+        )
 
     # check tasks
     assert pps.score(df, "x", "y")["task"] == "regression"
@@ -158,6 +180,16 @@ def test_predictors():
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", y]]
 
+    duplicate_column_names_df = pd.DataFrame()
+    duplicate_column_names_df["x1"] = np.random.uniform(-2, 2, 10)
+    duplicate_column_names_df["x2"] = np.random.uniform(-2, 2, 10)
+    duplicate_column_names_df["unique_column_name"] = np.random.uniform(-2, 2, 10)
+    duplicate_column_names_df.columns = [
+        "duplicate_column_name",
+        "duplicate_column_name",
+        "unique_column_name",
+    ]
+
     # check input types
     with pytest.raises(TypeError):
         numpy_array = np.random.randn(10, 10)  # not a DataFrame
@@ -171,6 +203,10 @@ def test_predictors():
 
     with pytest.raises(ValueError):
         pps.predictors(df, y, sorted="invalid_value_for_sorted")
+
+    with pytest.raises(AssertionError):
+        # df shall not have duplicate column names
+        pps.predictors(duplicate_column_names_df, "duplicate_column_name")
 
     # check return types
     result_df = pps.predictors(df, y)

@@ -266,9 +266,17 @@ def score(df, x, y, task=None, sample=5000):
         raise ValueError(
             f"The 'x' argument should be the name of a dataframe column but the name that you passed ({x}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
         )
+    if len(df[[x]].columns) >= 2:
+        raise AssertionError(
+            f"The dataframe has {len(df[[x]].columns)} columns with the same column name {x}\nPlease adjust the dataframe and make sure that only 1 column has the name {x}"
+        )
     if not y in df.columns:
         raise ValueError(
             f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+    if len(df[[y]].columns) >= 2:
+        raise AssertionError(
+            f"The dataframe has {len(df[[y]].columns)} columns with the same column name {y}\nPlease adjust the dataframe and make sure that only 1 column has the name {y}"
         )
     if task is not None:
         raise AttributeError(
@@ -354,6 +362,10 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
     if not y in df.columns:
         raise ValueError(
             f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+    if len(df[[y]].columns) >= 2:
+        raise AssertionError(
+            f"The dataframe has {len(df[[y]].columns)} columns with the same column name {y}\nPlease adjust the dataframe and make sure that only 1 column has the name {y}"
         )
     if not output in ["df", "list"]:
         raise ValueError(
