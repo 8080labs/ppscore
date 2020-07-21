@@ -83,7 +83,7 @@ def test_score():
 
     # check input types
     with pytest.raises(TypeError):
-        numpy_array = np.random.randn(10,10)  # not a DataFrame
+        numpy_array = np.random.randn(10, 10)  # not a DataFrame
         pps.score(numpy_array, "x", "y")
 
     with pytest.raises(ValueError):
@@ -92,7 +92,8 @@ def test_score():
     with pytest.raises(ValueError):
         pps.score(df, "x", "y_column_that_does_not_exist")
 
-    with pytest.raises(Exception):  # After dropping missing values, there are no valid rows left
+    with pytest.raises(Exception):
+        # After dropping missing values, there are no valid rows left
         pps.score(df, "nan", "y")
 
     assert pps.score(df, "x", "y", "regression")["task"] == "regression"
@@ -140,7 +141,7 @@ def test_predictors():
 
     # check input types
     with pytest.raises(TypeError):
-        numpy_array = np.random.randn(10,10)  # not a DataFrame
+        numpy_array = np.random.randn(10, 10)  # not a DataFrame
         pps.predictors(numpy_array, y)
 
     with pytest.raises(ValueError):
@@ -163,13 +164,14 @@ def test_predictors():
 
     # the underlying calculations are tested as part of test_score
 
+
 def test_matrix():
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", "Survived"]]
 
     # check input types
     with pytest.raises(TypeError):
-        numpy_array = np.random.randn(10,10)  # not a DataFrame
+        numpy_array = np.random.randn(10, 10)  # not a DataFrame
         pps.matrix(numpy_array)
 
     with pytest.raises(ValueError):
