@@ -285,6 +285,10 @@ def score(df, x, y, task=None, sample=5000):
         raise ValueError(
             f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
         )
+    if task is not None:
+        raise AttributeError(
+            "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\n"
+        )
 
     if x == y:
         task_name = "predict_itself"

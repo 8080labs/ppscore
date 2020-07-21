@@ -97,12 +97,18 @@ def test_score():
         # After dropping missing values, there are no valid rows left
         pps.score(df, "nan", "y")
 
-    assert pps.score(df, "x", "y", "regression")["task"] == "regression"
+    with pytest.raises(AttributeError):
+        # the task argument is not supported any more
+        pps.score(df, "x", "y", task="classification")
 
+    # check tasks
+    assert pps.score(df, "x", "y")["task"] == "regression"
+    assert pps.score(df, "x", "x_greater_0_string")["task"] == "classification"
     assert pps.score(df, "x", "constant")["task"] == "predict_constant"
     assert pps.score(df, "x", "x")["task"] == "predict_itself"
     assert pps.score(df, "x", "id")["task"] == "predict_id"
 
+    # check scores
     # feature is id
     assert pps.score(df, "id", "y")["ppscore"] == 0
 
