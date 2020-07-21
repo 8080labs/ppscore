@@ -180,27 +180,22 @@ def _infer_task(df, x, y):
 
     category_count = df[y].value_counts().count()
     if category_count == 1:
+        # it is helpful to separate this case in order to save unnecessary calculation time
         return "predict_constant"
-    if category_count == 2:
-        return "classification"
-    if category_count == len(df[y]) and (
-        is_string_dtype(df[y]) or is_categorical_dtype(df[y])
-    ):
+    if _dtype_represents_categories(df[y]) and (category_count == len(df[y])):
+        # it is important to separate this case in order to save unnecessary calculation time
         return "predict_id"
-    if category_count <= NUMERIC_AS_CATEGORIC_BREAKPOINT and is_numeric_dtype(df[y]):
-        return "classification"
 
     if _dtype_represents_categories(df[y]):
         return "classification"
+    if is_numeric_dtype(df[y]):
+        # this check needs to be after is_bool_dtype (which is part of _dtype_represents_categories) because bool is considered numeric by pandas
+        return "regression"
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
         raise TypeError(
             f"The target column {y} has the dtype {df[y].dtype} which is not supported. A possible solution might be to convert {y} to a string column"
         )
-
-    # this check needs to be after is_bool_dtype because bool is considered numeric by pandas
-    if is_numeric_dtype(df[y]):
-        return "regression"
 
     raise Exception(
         f"Could not infer a valid task based on the target {y}. The dtype {df[y].dtype} is not yet supported"

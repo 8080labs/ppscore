@@ -22,34 +22,46 @@ def test__normalized_mae_score():
 
 
 def test__infer_task():
-    # each check is in the same order as in the original implementation
     from ppscore.calculation import _infer_task
 
     df = pd.read_csv("examples/titanic.csv")
+    df = df.rename(
+        columns={
+            "Age": "Age_float",
+            "Pclass": "Pclass_integer",
+            "Survived": "Survived_integer",
+            "Ticket": "Ticket_object",
+            "Name": "Name_object_id",
+        }
+    )
 
-    assert _infer_task(df, "Age", "Age") == "predict_itself"
-
+    df["x"] = 1  # x is irrelevant for this test
     df["constant"] = 1
-    assert _infer_task(df, "Age", "constant") == "predict_constant"
+    df["Pclass_category"] = df["Pclass_integer"].astype("category")
+    df["Pclass_datetime"] = pd.to_datetime(
+        df["Pclass_integer"], infer_datetime_format=True
+    )
+    df["Survived_boolean"] = df["Survived_integer"].astype(bool)
+    df["Cabin_string"] = pd.Series(df["Cabin"].apply(str), dtype="string")
 
-    assert _infer_task(df, "Age", "Survived") == "classification"
+    # check special types
+    assert _infer_task(df, "x", "x") == "predict_itself"
+    assert _infer_task(df, "x", "constant") == "predict_constant"
+    assert _infer_task(df, "x", "Name_object_id") == "predict_id"
 
-    df = df.reset_index()
-    df["id"] = df["index"].astype(str)
-    assert _infer_task(df, "Age", "id") == "predict_id"
+    # check regression
+    assert _infer_task(df, "x", "Age_float") == "regression"
+    assert _infer_task(df, "x", "Pclass_integer") == "regression"
 
-    # classification because numeric but few categories
-    assert _infer_task(df, "Age", "SibSp") == "classification"
+    # check classification
+    assert _infer_task(df, "x", "Pclass_category") == "classification"
+    assert _infer_task(df, "x", "Survived_boolean") == "classification"
+    assert _infer_task(df, "x", "Ticket_object") == "classification"
+    assert _infer_task(df, "x", "Cabin_string") == "classification"
 
-    df["Pclass_category"] = df["Pclass"].astype("category")
-    assert _infer_task(df, "Age", "Pclass_category") == "classification"
-
-    df["Pclass_datetime"] = pd.to_datetime(df["Pclass"], infer_datetime_format=True)
+    # datetime columns are not supported
     with pytest.raises(TypeError):
-        # datetime columns are not supported
-        pps.score(df, "Age", "Pclass_datetime")
-
-    assert _infer_task(df, "Survived", "Age") == "regression"
+        pps.score(df, "x", "Pclass_datetime")
 
 
 def test__maybe_sample():
@@ -175,6 +187,7 @@ def test_predictors():
 def test_matrix():
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", "Survived"]]
+    df["Age_datetime"] = pd.to_datetime(df["Age"], infer_datetime_format=True)
 
     # check input types
     with pytest.raises(TypeError):
@@ -189,5 +202,4 @@ def test_matrix():
     assert isinstance(pps.matrix(df, output="dict"), dict)
 
     # matrix catches single score errors under the hood
-    df["Age_datetime"] = pd.to_datetime(df["Age"], infer_datetime_format=True)
     assert pps.matrix(df[["Survived", "Age_datetime"]])["Survived"]["Age_datetime"] == 0
