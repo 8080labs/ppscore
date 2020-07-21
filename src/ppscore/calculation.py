@@ -19,16 +19,6 @@ CV_ITERATIONS = 4
 
 RANDOM_SEED = 587136
 
-# if a numeric column has less than 15 unique values, it is inferred as categoric
-# thus, the ppscore will use a classification
-# this has important implications on the ppscore
-# eg if you have 4 equal categories encoded 0, 1, 2, 3 and treat it as a regression
-# then the baseline is 1 (median) which is okayish and a predictor will have a harder time
-# to beat the baseline, thus the ppscore will be considerably lower
-# if the column is encoded as category, then the baseline will be to always predict 0
-# this baseline will be way easier to beat and thus result in a higher ppscore
-NUMERIC_AS_CATEGORIC_BREAKPOINT = 15
-
 
 def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
     "Calculates the mean model score based on cross-validation"
@@ -440,5 +430,5 @@ def matrix(df, output="df", **kwargs):
         matrix = pd.DataFrame.from_dict(data, orient="index")
         matrix.columns = columns
         return matrix
-    else:  # output == "dict"
+    elif output == "dict":
         return data
