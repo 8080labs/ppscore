@@ -25,8 +25,7 @@ CV_ITERATIONS = 4
 RANDOM_SEED = 587136
 
 
-# def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs):
-def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
+def _calculate_model_cv_score_(df, target, feature, task, cv, **kwargs):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
     # https://scikit-learn.org/stable/modules/tree.html
@@ -49,6 +48,7 @@ def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
     if task["type"] == "classification":
         label_encoder = preprocessing.LabelEncoder()
         df[target] = label_encoder.fit_transform(df[target])
+        target_series = df[target]
     else:
         target_series = df[target]
 
@@ -312,17 +312,6 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         A dict that contains multiple fields about the resulting PPS.
         The dict enables introspection into the calculations that have been performed under the hood
     """
-
-    if cv is None:
-        # Did not pass any CV - fallback to defaults:
-        # Crossvalidation is stratifiedKFold for classification, KFold for regression
-        cv = CV_ITERATIONS
-
-    if isinstance(cv, int):
-        # We either passed an integer for CV, or None and got cv set to an integer value of CV_ITERATIONS above
-        # Shuffle data to imitate KFold(shuffle=True)
-        df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
-
     if not isinstance(df, pd.DataFrame):
         raise TypeError(
             f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
@@ -347,6 +336,16 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         raise AttributeError(
             "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
         )
+
+    if cv is None:
+        # Did not pass any CV - fallback to defaults:
+        # Crossvalidation is stratifiedKFold for classification, KFold for regression
+        cv = CV_ITERATIONS
+
+    if isinstance(cv, int):
+        # We either passed an integer for CV, or None and got cv set to an integer value of CV_ITERATIONS above
+        # Shuffle data to imitate KFold(shuffle=True)
+        df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     if x == y:
         task_name = "predict_itself"
