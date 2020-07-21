@@ -12,6 +12,7 @@ __pycache__/*
 .cache/*
 .*.swp
 */.ipynb_checkpoints/*
+*/*/.ipynb_checkpoints/*
 
 # Project files
 .ropeproject
@@ -50,3 +51,4 @@ MANIFEST
 
 .DS_Store
 .vscode/settings.json
+devstuff.py

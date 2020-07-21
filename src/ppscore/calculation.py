@@ -9,6 +9,7 @@ import pandas as pd
 from pandas.api.types import (
     is_numeric_dtype,
     is_bool_dtype,
+    is_object_dtype,
     is_categorical_dtype,
     is_string_dtype,
     is_datetime64_any_dtype,
@@ -23,33 +24,31 @@ CV_ITERATIONS = 4
 
 RANDOM_SEED = 587136
 
-# if a numeric column has less than 15 unique values, it is inferred as categoric
-# thus, the ppscore will use a classification
-# this has important implications on the ppscore
-# eg if you have 4 equal categories encoded 0, 1, 2, 3 and treat it as a regression
-# then the baseline is 1 (median) which is okayish and a predictor will have a harder time
-# to beat the baseline, thus the ppscore will be considerably lower
-# if the column is encoded as category, then the baseline will be to always predict 0
-# this baseline will be way easier to beat and thus result in a higher ppscore
-NUMERIC_AS_CATEGORIC_BREAKPOINT = 15
 
-
-def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs):
+# def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs):
+def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
     # https://scikit-learn.org/stable/modules/tree.html
     # https://scikit-learn.org/stable/modules/cross_validation.html
     # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
 
+    metric = task["metric_key"]
+    model = task["model"]
+    # shuffle the rows - this is important for crossvalidation
+    # because the crossvalidation just takes the first n lines
+    # if there is a strong pattern in the rows eg 0,0,0,0,1,1,1,1
+    # then this will lead to problems because the first cv sees mostly 0 and the later 1
+    # this approach might be wrong for timeseries because it might leak information
+    df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
+
     # preprocess target
     # TODO: this has a risk of leaking information if a target encoder were to be used, or misleading a
     # TODO: tree if some classes are not observed in some training folds
     # TODO: we need to make pre-processing a part of CV pipeline
-
-    if df[target].dtype == object:
-        le = preprocessing.LabelEncoder()
-        df[target] = le.fit_transform(df[target])
-        target_series = df[target]
+    if task["type"] == "classification":
+        label_encoder = preprocessing.LabelEncoder()
+        df[target] = label_encoder.fit_transform(df[target])
     else:
         target_series = df[target]
 
@@ -69,6 +68,16 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs)
     else:
         pipeline_model = make_pipeline(preprocess, model)
 
+    # # IMPORTANT: changes on master TODO: decide what to do with them
+    # if _dtype_represents_categories(df[feature]):
+    #     one_hot_encoder = preprocessing.OneHotEncoder()
+    #     array = df[feature].__array__()
+    #     sparse_matrix = one_hot_encoder.fit_transform(array.reshape(-1, 1))
+    #     feature_input = sparse_matrix
+    # else:
+    #     # reshaping needed because there is only 1 feature
+    #     feature_input = df[feature].values.reshape(-1, 1)
+
     # Pull the groups out if passed
     groups = kwargs.get("groups", None)
 
@@ -85,9 +94,9 @@ def _calculate_model_cv_score_(df, target, feature, metric, model, cv, **kwargs)
 def _normalized_mae_score(model_mae, naive_mae):
     """Normalizes the model MAE score, given the baseline score"""
     # # Value range of MAE is [0, infinity), 0 is best
-    # 10, 5 >> 0 because worse than naive
-    # 10, 20 >> 0.5
-    # 5, 20 >> 0.75 = 1 - (mae/base_mae)
+    # 10, 5 ==> 0 because worse than naive
+    # 10, 20 ==> 0.5
+    # 5, 20 ==> 0.75 = 1 - (mae/base_mae)
     if model_mae > naive_mae:
         return 0
     else:
@@ -121,8 +130,8 @@ def _normalized_f1_score(model_f1, baseline_f1):
     """Normalizes the model F1 score, given the baseline score"""
     # # F1 ranges from 0 to 1
     # # 1 is best
-    # 0.5, 0.7 = 0 because worse than naive
-    # 0.75, 0.5 > 0.5
+    # 0.5, 0.7 ==> 0 because model is worse than naive baseline
+    # 0.75, 0.5 ==> 0.5
     #
     if model_f1 < baseline_f1:
         return 0
@@ -130,6 +139,7 @@ def _normalized_f1_score(model_f1, baseline_f1):
         scale_range = 1.0 - baseline_f1  # eg 0.3
         f1_diff = model_f1 - baseline_f1  # eg 0.1
         return f1_diff / scale_range  # 0.1/0.3 = 0.33
+
 
 
 def _f1_normalizer(df, y, model_score, cv, **kwargs):
@@ -143,39 +153,69 @@ def _f1_normalizer(df, y, model_score, cv, **kwargs):
     ppscore = _normalized_f1_score(model_score, baseline_score)
     return ppscore, baseline_score
 
+# # TODO: code from master
+# def _f1_normalizer(df, y, model_score):
+#     "In case of F1, calculates the baseline score for y and derives the PPS."
+#     label_encoder = preprocessing.LabelEncoder()
+#     df["truth"] = label_encoder.fit_transform(df[y])
+#     df["most_common_value"] = df["truth"].value_counts().index[0]
+#     random = df["truth"].sample(frac=1)
+
+#     baseline_score = max(
+#         f1_score(df["truth"], df["most_common_value"], average="weighted"),
+#         f1_score(df["truth"], random, average="weighted"),
+#     )
+#     ppscore = _normalized_f1_score(model_score, baseline_score)
+#     return ppscore, baseline_score
+
 
 TASKS = {
     "regression": {
+        "type": "regression",
         "metric_name": "mean absolute error",
         "metric_key": "neg_mean_absolute_error",
         "model": tree.DecisionTreeRegressor(),
         "score_normalizer": _mae_normalizer,
     },
     "classification": {
+        "type": "classification",
         "metric_name": "weighted F1",
         "metric_key": "f1_weighted",
         "model": tree.DecisionTreeClassifier(),
         "score_normalizer": _f1_normalizer,
     },
     "predict_itself": {
+        "type": "predict_itself",
         "metric_name": None,
         "metric_key": None,
         "model": None,
         "score_normalizer": None,
     },
     "predict_constant": {
+        "type": "predict_constant",
         "metric_name": None,
         "metric_key": None,
         "model": None,
         "score_normalizer": None,
     },
     "predict_id": {
+        "type": "predict_id",
         "metric_name": None,
         "metric_key": None,
         "model": None,
         "score_normalizer": None,
     },
 }
+
+
+def _dtype_represents_categories(series) -> bool:
+    "Determines if the dtype of the series represents categorical values"
+    return (
+        is_bool_dtype(series)
+        or is_object_dtype(series)
+        or is_string_dtype(series)
+        or is_categorical_dtype(series)
+    )
 
 
 def _infer_task(df, x, y):
@@ -185,27 +225,22 @@ def _infer_task(df, x, y):
 
     category_count = df[y].value_counts().count()
     if category_count == 1:
+        # it is helpful to separate this case in order to save unnecessary calculation time
         return "predict_constant"
-    if category_count == 2:
-        return "classification"
-    if category_count == len(df[y]) and (
-        is_string_dtype(df[y]) or is_categorical_dtype(df[y])
-    ):
+    if _dtype_represents_categories(df[y]) and (category_count == len(df[y])):
+        # it is important to separate this case in order to save unnecessary calculation time
         return "predict_id"
-    if category_count <= NUMERIC_AS_CATEGORIC_BREAKPOINT and is_numeric_dtype(df[y]):
-        return "classification"
 
-    if is_bool_dtype(df[y]) or is_string_dtype(df[y]) or is_categorical_dtype(df[y]):
+    if _dtype_represents_categories(df[y]):
         return "classification"
+    if is_numeric_dtype(df[y]):
+        # this check needs to be after is_bool_dtype (which is part of _dtype_represents_categories) because bool is considered numeric by pandas
+        return "regression"
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
-        raise Exception(
+        raise TypeError(
             f"The target column {y} has the dtype {df[y].dtype} which is not supported. A possible solution might be to convert {y} to a string column"
         )
-
-    # this check needs to be after is_bool_dtype because bool is considered numeric by pandas
-    if is_numeric_dtype(df[y]):
-        return "regression"
 
     raise Exception(
         f"Could not infer a valid task based on the target {y}. The dtype {df[y].dtype} is not yet supported"
@@ -263,10 +298,6 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         Name of the column x which acts as the feature
     y : str
         Name of the column y which acts as the target
-    task : str, default ``None``
-        Name of the prediction task, e.g. ``classification`` or ``regression``
-        If the task is not specified, it is infered based on the y column
-        The task determines which model and evaluation score is used for the PPS
     sample : int or ``None``
         Number of rows for sampling. The sampling decreases the calculation time of the PPS.
         If ``None`` there will be no sampling.
@@ -291,6 +322,31 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
         # We either passed an integer for CV, or None and got cv set to an integer value of CV_ITERATIONS above
         # Shuffle data to imitate KFold(shuffle=True)
         df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
+
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(
+            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
+        )
+    if not x in df.columns:
+        raise ValueError(
+            f"The 'x' argument should be the name of a dataframe column but the name that you passed ({x}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+    if len(df[[x]].columns) >= 2:
+        raise AssertionError(
+            f"The dataframe has {len(df[[x]].columns)} columns with the same column name {x}\nPlease adjust the dataframe and make sure that only 1 column has the name {x}"
+        )
+    if not y in df.columns:
+        raise ValueError(
+            f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+    if len(df[[y]].columns) >= 2:
+        raise AssertionError(
+            f"The dataframe has {len(df[[y]].columns)} columns with the same column name {y}\nPlease adjust the dataframe and make sure that only 1 column has the name {y}"
+        )
+    if task is not None:
+        raise AttributeError(
+            "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
+        )
 
     if x == y:
         task_name = "predict_itself"
@@ -327,13 +383,12 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
             df,
             target=y,
             feature=x,
-            metric=task["metric_key"],
-            model=task["model"],
+            task=task,
             cv=cv,
             **kwargs,
         )
         ppscore, baseline_score = task["score_normalizer"](
-            df, y, model_score, cv, **kwargs
+            df, y, model_score, cv, **kwargs  # TODO: kwargs needed?
         )
 
     return {
@@ -348,8 +403,71 @@ def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
     }
 
 
-# def predictors(df, y, task=None, sorted=True):
-#    pass
+def predictors(df, y, output="df", sorted=True, **kwargs):
+    """
+    Calculate the Predictive Power Score (PPS) of all the features in the dataframe
+    against a target column
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The dataframe that contains the data
+    y : str
+        Name of the column y which acts as the target
+    output: str - potential values: "df", "list"
+        Control the type of the output. Either return a df or a dict with all the
+        PPS dicts arranged by the feature columns in df
+    sorted: bool
+        Whether or not to sort the output dataframe/list
+    kwargs:
+        Other key-word arguments that shall be forwarded to the pps.score method
+
+    Returns
+    -------
+    pandas.DataFrame or list of Dict
+        Either returns a df or a list of all the PPS dicts. This can be influenced
+        by the output argument
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(
+            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
+        )
+    if not y in df.columns:
+        raise ValueError(
+            f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+    if len(df[[y]].columns) >= 2:
+        raise AssertionError(
+            f"The dataframe has {len(df[[y]].columns)} columns with the same column name {y}\nPlease adjust the dataframe and make sure that only 1 column has the name {y}"
+        )
+    if not output in ["df", "list"]:
+        raise ValueError(
+            f"""The 'output' argument should be one of ["df", "list"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
+        )
+    if not sorted in [True, False]:
+        raise ValueError(
+            f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
+        )
+
+    scores = [score(df, column, y, **kwargs) for column in df if column != y]
+
+    if sorted:
+        scores.sort(key=lambda item: item["ppscore"], reverse=True)
+
+    if output == "df":
+        df_columns = [
+            "x",
+            "ppscore",
+            "y",
+            "task",
+            "metric",
+            "baseline_score",
+            "model_score",
+        ]
+        data = {column: [score[column] for score in scores] for column in df_columns}
+        scores = pd.DataFrame.from_dict(data)
+
+    return scores
 
 
 def matrix(df, output="df", **kwargs):
@@ -370,6 +488,14 @@ def matrix(df, output="df", **kwargs):
     pandas.DataFrame or Dict
         Either returns a df or a dict with all the PPS dicts arranged by the target column. This can be influenced by the output argument
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(
+            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
+        )
+    if not output in ["df", "dict"]:
+        raise ValueError(
+            f"""The 'output' argument should be one of ["df", "dict"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
+        )
     data = {}
     columns = list(df.columns)
 
@@ -389,5 +515,5 @@ def matrix(df, output="df", **kwargs):
         matrix = pd.DataFrame.from_dict(data, orient="index")
         matrix.columns = columns
         return matrix
-    else:  # output == "dict"
+    elif output == "dict":
         return data
