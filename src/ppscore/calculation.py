@@ -243,10 +243,6 @@ def score(df, x, y, task=None, sample=5000):
         Name of the column x which acts as the feature
     y : str
         Name of the column y which acts as the target
-    task : str, default ``None``
-        Name of the prediction task, e.g. ``classification`` or ``regression``
-        If the task is not specified, it is infered based on the y column
-        The task determines which model and evaluation score is used for the PPS
     sample : int or ``None``
         Number of rows for sampling. The sampling decreases the calculation time of the PPS.
         If ``None`` there will be no sampling.
