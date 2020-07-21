@@ -50,4 +50,5 @@ MANIFEST
 .venv*/
 
 .DS_Store
+.vscode/settings.json
 devstuff.py

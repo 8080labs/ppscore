@@ -1,8 +1,10 @@
 from sklearn import tree
 from sklearn import preprocessing
+from sklearn.dummy import DummyRegressor, DummyClassifier
 from sklearn.model_selection import cross_val_score
-from sklearn.metrics import mean_absolute_error, f1_score
-
+from sklearn.metrics import f1_score
+from sklearn.compose import make_column_transformer, ColumnTransformer
+import numpy as np
 import pandas as pd
 from pandas.api.types import (
     is_numeric_dtype,
@@ -15,17 +17,21 @@ from pandas.api.types import (
 )
 
 # if the number is 4, then it is possible to detect patterns when there are at least 4 times the same observation. If the limit is increased, the minimum observations also increase. This is important, because this is the limit when sklearn will throw an error which will lead to a score of 0 if we catch it
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder
+
 CV_ITERATIONS = 4
 
 RANDOM_SEED = 587136
 
 
-def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
+def _calculate_model_cv_score_(df, target, feature, task, cv, **kwargs):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
     # https://scikit-learn.org/stable/modules/tree.html
     # https://scikit-learn.org/stable/modules/cross_validation.html
     # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
+
     metric = task["metric_key"]
     model = task["model"]
     # shuffle the rows - this is important for crossvalidation
@@ -36,6 +42,9 @@ def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
     df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     # preprocess target
+    # TODO: this has a risk of leaking information if a target encoder were to be used, or misleading a
+    # TODO: tree if some classes are not observed in some training folds
+    # TODO: we need to make pre-processing a part of CV pipeline
     if task["type"] == "classification":
         label_encoder = preprocessing.LabelEncoder()
         df[target] = label_encoder.fit_transform(df[target])
@@ -44,26 +53,46 @@ def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
         target_series = df[target]
 
     # preprocess feature
-    if _dtype_represents_categories(df[feature]):
-        one_hot_encoder = preprocessing.OneHotEncoder()
-        array = df[feature].__array__()
-        sparse_matrix = one_hot_encoder.fit_transform(array.reshape(-1, 1))
-        feature_input = sparse_matrix
-    else:
-        # reshaping needed because there is only 1 feature
-        feature_input = df[feature].values.reshape(-1, 1)
+    preprocess = None
+    if df[feature].dtype == object:
+        # Dealing with categorical feature here here:
+        preprocess = ColumnTransformer(
+            transformers=[("ct", OneHotEncoder(), [feature])]
+        )
 
+    # reshaping needed because there is only 1 feature: coerce to DataFrame
+    feature_df = df[feature].to_frame()
+
+    if preprocess is None:
+        pipeline_model = model
+    else:
+        pipeline_model = make_pipeline(preprocess, model)
+
+    # # IMPORTANT: changes on master TODO: decide what to do with them
+    # if _dtype_represents_categories(df[feature]):
+    #     one_hot_encoder = preprocessing.OneHotEncoder()
+    #     array = df[feature].__array__()
+    #     sparse_matrix = one_hot_encoder.fit_transform(array.reshape(-1, 1))
+    #     feature_input = sparse_matrix
+    # else:
+    #     # reshaping needed because there is only 1 feature
+    #     feature_input = df[feature].values.reshape(-1, 1)
+
+    # Pull the groups out if passed
+    groups = kwargs.get("groups", None)
+
+    # Run crossvalidation with the CV specified
     # Crossvalidation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
     scores = cross_val_score(
-        model, feature_input, target_series, cv=CV_ITERATIONS, scoring=metric
+        pipeline_model, feature_df, target_series, cv=cv, scoring=metric, groups=groups
     )
 
     return scores.mean()
 
 
 def _normalized_mae_score(model_mae, naive_mae):
-    "Normalizes the model MAE score, given the baseline score"
+    """Normalizes the model MAE score, given the baseline score"""
     # # Value range of MAE is [0, infinity), 0 is best
     # 10, 5 ==> 0 because worse than naive
     # 10, 20 ==> 0.5
@@ -74,17 +103,31 @@ def _normalized_mae_score(model_mae, naive_mae):
         return 1 - (model_mae / naive_mae)
 
 
-def _mae_normalizer(df, y, model_score):
-    "In case of MAE, calculates the baseline score for y and derives the PPS."
+def _mae_normalizer(df, y, model_score, cv, **kwargs):
+    """
+    In case of MAE, calculates the baseline score for y and derives the PPS.
+
+    """
     df["naive"] = df[y].median()
-    baseline_score = mean_absolute_error(df[y], df["naive"])  # true, pred
+    # Re-write baseline score using DummyRegressor with median strategy
+    baseline_regr = DummyRegressor(strategy="median")
+    groups = kwargs.get("groups", None)
+    baseline_scores_cv = cross_val_score(
+        baseline_regr,
+        df,
+        df[y],
+        cv=cv,
+        scoring="neg_mean_absolute_error",
+        groups=groups,
+    )
+    baseline_score = np.mean(np.abs(baseline_scores_cv))
 
     ppscore = _normalized_mae_score(abs(model_score), baseline_score)
     return ppscore, baseline_score
 
 
 def _normalized_f1_score(model_f1, baseline_f1):
-    "Normalizes the model F1 score, given the baseline score"
+    """Normalizes the model F1 score, given the baseline score"""
     # # F1 ranges from 0 to 1
     # # 1 is best
     # 0.5, 0.7 ==> 0 because model is worse than naive baseline
@@ -98,20 +141,32 @@ def _normalized_f1_score(model_f1, baseline_f1):
         return f1_diff / scale_range  # 0.1/0.3 = 0.33
 
 
-def _f1_normalizer(df, y, model_score):
-    "In case of F1, calculates the baseline score for y and derives the PPS."
-    label_encoder = preprocessing.LabelEncoder()
-    df["truth"] = label_encoder.fit_transform(df[y])
-    df["most_common_value"] = df["truth"].value_counts().index[0]
-    random = df["truth"].sample(frac=1)
 
-    baseline_score = max(
-        f1_score(df["truth"], df["most_common_value"], average="weighted"),
-        f1_score(df["truth"], random, average="weighted"),
+def _f1_normalizer(df, y, model_score, cv, **kwargs):
+    """In case of F1, calculates the baseline score for y and derives the PPS."""
+    baseline_clf = DummyClassifier(strategy="stratified")
+    groups = kwargs.get("groups", None)
+    baseline_scores_cv = cross_val_score(
+        baseline_clf, df, df[y], cv=cv, scoring="f1_weighted", groups=groups
     )
-
+    baseline_score = baseline_scores_cv.mean()
     ppscore = _normalized_f1_score(model_score, baseline_score)
     return ppscore, baseline_score
+
+# # TODO: code from master
+# def _f1_normalizer(df, y, model_score):
+#     "In case of F1, calculates the baseline score for y and derives the PPS."
+#     label_encoder = preprocessing.LabelEncoder()
+#     df["truth"] = label_encoder.fit_transform(df[y])
+#     df["most_common_value"] = df["truth"].value_counts().index[0]
+#     random = df["truth"].sample(frac=1)
+
+#     baseline_score = max(
+#         f1_score(df["truth"], df["most_common_value"], average="weighted"),
+#         f1_score(df["truth"], random, average="weighted"),
+#     )
+#     ppscore = _normalized_f1_score(model_score, baseline_score)
+#     return ppscore, baseline_score
 
 
 TASKS = {
@@ -164,7 +219,7 @@ def _dtype_represents_categories(series) -> bool:
 
 
 def _infer_task(df, x, y):
-    "Returns str with the name of the inferred task based on the columns x and y"
+    """Returns str with the name of the inferred task based on the columns x and y"""
     if x == y:
         return "predict_itself"
 
@@ -193,7 +248,7 @@ def _infer_task(df, x, y):
 
 
 def _feature_is_id(df, x):
-    "Returns Boolean if the feature column x is an ID"
+    """Returns Boolean if the feature column x is an ID"""
     if not (is_string_dtype(df[x]) or is_categorical_dtype(df[x])):
         return False
 
@@ -226,7 +281,7 @@ def _maybe_sample(df, sample):
     return df
 
 
-def score(df, x, y, task=None, sample=5000):
+def score(df, x, y, task=None, sample=5000, cv=None, **kwargs):
     """
     Calculate the Predictive Power Score (PPS) for "x predicts y"
     The score always ranges from 0 to 1 and is data-type agnostic.
@@ -246,6 +301,10 @@ def score(df, x, y, task=None, sample=5000):
     sample : int or ``None``
         Number of rows for sampling. The sampling decreases the calculation time of the PPS.
         If ``None`` there will be no sampling.
+    cv: iterable or sklearn-compatible cv object
+        Crossvalidation strategy to be used. if `None`, cv defaults to:
+         stratifiedKFold for classification, KFold for regression
+
 
     Returns
     -------
@@ -253,7 +312,6 @@ def score(df, x, y, task=None, sample=5000):
         A dict that contains multiple fields about the resulting PPS.
         The dict enables introspection into the calculations that have been performed under the hood
     """
-
     if not isinstance(df, pd.DataFrame):
         raise TypeError(
             f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
@@ -278,6 +336,16 @@ def score(df, x, y, task=None, sample=5000):
         raise AttributeError(
             "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
         )
+
+    if cv is None:
+        # Did not pass any CV - fallback to defaults:
+        # Crossvalidation is stratifiedKFold for classification, KFold for regression
+        cv = CV_ITERATIONS
+
+    if isinstance(cv, int):
+        # We either passed an integer for CV, or None and got cv set to an integer value of CV_ITERATIONS above
+        # Shuffle data to imitate KFold(shuffle=True)
+        df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
 
     if x == y:
         task_name = "predict_itself"
@@ -310,9 +378,17 @@ def score(df, x, y, task=None, sample=5000):
         ppscore = 0
         baseline_score = 0
     else:
-
-        model_score = _calculate_model_cv_score_(df, target=y, feature=x, task=task)
-        ppscore, baseline_score = task["score_normalizer"](df, y, model_score)
+        model_score = _calculate_model_cv_score_(
+            df,
+            target=y,
+            feature=x,
+            task=task,
+            cv=cv,
+            **kwargs,
+        )
+        ppscore, baseline_score = task["score_normalizer"](
+            df, y, model_score, cv, **kwargs  # TODO: kwargs needed?
+        )
 
     return {
         "x": x,
