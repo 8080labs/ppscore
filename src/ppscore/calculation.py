@@ -273,6 +273,19 @@ def score(df, x, y, task=None, sample=5000):
         The dict enables introspection into the calculations that have been performed under the hood
     """
 
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(
+            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
+        )
+    if not x in df.columns:
+        raise ValueError(
+            f"The 'x' argument should be the name of a dataframe column but the name that you passed ({x}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+    if not y in df.columns:
+        raise ValueError(
+            f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+
     if x == y:
         task_name = "predict_itself"
     else:
@@ -345,6 +358,23 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Either returns a df or a list of all the PPS dicts. This can be influenced
         by the output argument
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(
+            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
+        )
+    if not y in df.columns:
+        raise ValueError(
+            f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+        )
+    if not output in ["df", "list"]:
+        raise ValueError(
+            f"""The 'output' argument should be one of ["df", "list"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
+        )
+    if not sorted in [True, False]:
+        raise ValueError(
+            f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
+        )
+
     scores = [score(df, column, y, **kwargs) for column in df if column != y]
 
     if sorted:
@@ -384,6 +414,14 @@ def matrix(df, output="df", **kwargs):
     pandas.DataFrame or Dict
         Either returns a df or a dict with all the PPS dicts arranged by the target column. This can be influenced by the output argument
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(
+            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
+        )
+    if not output in ["df", "dict"]:
+        raise ValueError(
+            f"""The 'output' argument should be one of ["df", "dict"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
+        )
     data = {}
     columns = list(df.columns)
 

@@ -80,7 +80,19 @@ def test_score():
     df["x_greater_0_boolean_category"] = df["x_greater_0_boolean"].astype("category")
 
     df["nan"] = np.nan
-    with pytest.raises(Exception):
+
+    # check input types
+    with pytest.raises(TypeError):
+        numpy_array = np.random.randn(10,10)  # not a DataFrame
+        pps.score(numpy_array, "x", "y")
+
+    with pytest.raises(ValueError):
+        pps.score(df, "x_column_that_does_not_exist", "y")
+
+    with pytest.raises(ValueError):
+        pps.score(df, "x", "y_column_that_does_not_exist")
+
+    with pytest.raises(Exception):  # After dropping missing values, there are no valid rows left
         pps.score(df, "nan", "y")
 
     assert pps.score(df, "x", "y", "regression")["task"] == "regression"
@@ -126,6 +138,21 @@ def test_predictors():
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", y]]
 
+    # check input types
+    with pytest.raises(TypeError):
+        numpy_array = np.random.randn(10,10)  # not a DataFrame
+        pps.predictors(numpy_array, y)
+
+    with pytest.raises(ValueError):
+        pps.predictors(df, "y_column_that_does_not_exist")
+
+    with pytest.raises(ValueError):
+        pps.predictors(df, y, output="invalid_output_type")
+
+    with pytest.raises(ValueError):
+        pps.predictors(df, y, sorted="invalid_value_for_sorted")
+
+    # check return types
     result_df = pps.predictors(df, y)
     assert isinstance(result_df, pd.DataFrame)
     assert not y in result_df.index
@@ -134,11 +161,21 @@ def test_predictors():
     assert isinstance(list_of_dicts, list)
     assert isinstance(list_of_dicts[0], dict)
 
+    # the underlying calculations are tested as part of test_score
 
 def test_matrix():
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", "Survived"]]
 
+    # check input types
+    with pytest.raises(TypeError):
+        numpy_array = np.random.randn(10,10)  # not a DataFrame
+        pps.matrix(numpy_array)
+
+    with pytest.raises(ValueError):
+        pps.matrix(df, output="invalid_output_type")
+
+    # check return types
     assert isinstance(pps.matrix(df), pd.DataFrame)
     assert isinstance(pps.matrix(df, output="dict"), dict)
 
