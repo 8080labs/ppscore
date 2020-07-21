@@ -45,7 +45,8 @@ def test__infer_task():
     assert _infer_task(df, "Age", "Pclass_category") == "classification"
 
     df["Pclass_datetime"] = pd.to_datetime(df["Pclass"], infer_datetime_format=True)
-    with pytest.raises(Exception):
+    with pytest.raises(TypeError):
+        # datetime columns are not supported
         pps.score(df, "Age", "Pclass_datetime")
 
     assert _infer_task(df, "Survived", "Age") == "regression"

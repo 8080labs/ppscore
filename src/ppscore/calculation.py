@@ -75,9 +75,9 @@ def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
 def _normalized_mae_score(model_mae, naive_mae):
     "Normalizes the model MAE score, given the baseline score"
     # # Value range of MAE is [0, infinity), 0 is best
-    # 10, 5 >> 0 because worse than naive
-    # 10, 20 >> 0.5
-    # 5, 20 >> 0.75 = 1 - (mae/base_mae)
+    # 10, 5 ==> 0 because worse than naive
+    # 10, 20 ==> 0.5
+    # 5, 20 ==> 0.75 = 1 - (mae/base_mae)
     if model_mae > naive_mae:
         return 0
     else:
@@ -97,8 +97,8 @@ def _normalized_f1_score(model_f1, baseline_f1):
     "Normalizes the model F1 score, given the baseline score"
     # # F1 ranges from 0 to 1
     # # 1 is best
-    # 0.5, 0.7 = 0 because worse than naive
-    # 0.75, 0.5 > 0.5
+    # 0.5, 0.7 ==> 0 because model is worse than naive baseline
+    # 0.75, 0.5 ==> 0.5
     #
     if model_f1 < baseline_f1:
         return 0
@@ -194,7 +194,7 @@ def _infer_task(df, x, y):
         return "classification"
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
-        raise Exception(
+        raise TypeError(
             f"The target column {y} has the dtype {df[y].dtype} which is not supported. A possible solution might be to convert {y} to a string column"
         )
 
