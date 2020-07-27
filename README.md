@@ -1,6 +1,6 @@
 # ppscore - a Python implementation of the Predictive Power Score (PPS)
 
-### From the makers of [bamboolib](https://bamboolib.com)
+### From the makers of [bamboolib - a GUI for pandas DataFrames](https://bamboolib.com)
 
 
 __If you don't know yet what the Predictive Power Score is, please read the following blog post:__
@@ -81,7 +81,7 @@ sns.barplot(data=df_predictors, x="x", y="ppscore")
 
 ## API
 
-### ppscore.score(df, x, y, sample=5000)
+### ppscore.score(df, x, y, sample=5_000, cross_validation=4, random_seed=None)
 
 Calculate the Predictive Power Score (PPS) for "x predicts y"
 
@@ -105,7 +105,12 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
 - __sample__ : int or ``None``
     - Number of rows for sampling. The sampling decreases the calculation time of the PPS.
     If ``None`` there will be no sampling.
-
+- __cross_validation__ : int
+    - Number of iterations during cross-validation. This has the following implications:
+    For example, if the number is 4, then it is possible to detect patterns when there are at least 4 times the same observation. If the limit is increased, the required minimum observations also increase. This is important, because this is the limit when sklearn will throw an error and the PPS cannot be calculated
+- __random_seed__ : int or ``None``
+    - Random seed for the parts of the calculation that require random numbers, e.g. shuffling or sampling.
+    If the value is set, the results will be reproducible. If the value is ``None`` a new random number is drawn at the start of each calculation.
 #### Returns
 
 - __Dict__:
@@ -127,7 +132,7 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
 - __sorted__ : bool
     - Whether or not to sort the output dataframe/list
 - __kwargs__ :
-    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__
+    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, or __random_seed__
 
 #### Returns
 
@@ -146,7 +151,7 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 - __output__ : str - potential values: "df", "dict"
     - Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the target column
 - __kwargs__ :
-    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__
+    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, or __random_seed__
 
 #### Returns
 
@@ -161,10 +166,11 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 There are multiple ways how you can calculate the PPS. The ppscore package provides a sample implementation that is based on the following calculations:
 
 - The score is calculated using only 1 feature trying to predict the target column. This means there are no interaction effects between the scores of various features. Note that this is in contrast to feature importance
-- The score is calculated on the test sets of a 4-fold crossvalidation (number is adjustable via `ppscore.CV_ITERATIONS`). For classification, stratifiedKFold is used. For regression, normal KFold. Please note that this sampling might not be valid for time series data sets
+- The score is calculated on the test sets of a 4-fold cross-validation (number is adjustable via `cross_validation`). For classification, stratifiedKFold is used. For regression, normal KFold. Please note that this sampling might not be valid for time series data sets
 - All rows which have a missing value in the feature or the target column are dropped
-- In case that the dataset has more than 5,000 rows the score is only calculated on a random subset of 5,000 rows with a fixed random seed (`ppscore.RANDOM_SEED`). You can adjust the number of rows or skip this sampling via the API. However, in most scenarios the results will be very similar
+- In case that the dataset has more than 5,000 rows the score is only calculated on a random subset of 5,000 rows. You can adjust the number of rows or skip this sampling via the API (`sample`). However, in most scenarios the results will be very similar
 - There is no grid search for optimal model parameters
+- The result might change between calculations because the calculation contains random elements, e.g. the sampling of the rows or the shuffling of the rows before cross-validation. If you want to make sure that your results are reproducible you can set the random seed (`random_seed`).
 
 
 ### Learning algorithm
@@ -231,9 +237,9 @@ If the task is a classification, we compute the weighted F1 score (wF1) as the u
 #### Special tasks
 
 The special tasks all have predefined PPS scores. Those tasks exist for implementation reasons in order to communicate special cases and save computation time.
-- __predict_id__ has a score of 0 because an ID column cannot be predicted by any other column as part of a crossvalidation. There still might be a 1 to 1 relationship but this is not detectable by the current implementation of the PPS.
+- __predict_id__ has a score of 0 because an ID column cannot be predicted by any other column as part of a cross-validation. There still might be a 1 to 1 relationship but this is not detectable by the current implementation of the PPS.
 - __predict_constant__ has a score of 1 because any column and baseline can perfectly predict a column that only has a single value. It could be argued that the score should be 0 because the model is not better than the naive predictor. However, (so far) we chose to set a value of 1 in order to communicate that there is perfect predictive power.
 - __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1 because a column can always perfectly predict its own value.
 
 ## About
-ppscore is developed by [8080 Labs](https://8080labs.com) - we create tools for Python Data Scientists. If you like `ppscore`, please check out our other project [bamboolib](https://bamboolib.com)
+ppscore is developed by [8080 Labs](https://8080labs.com) - we create tools for Python Data Scientists. If you like `ppscore` you might want to check out our other project [bamboolib - a GUI for pandas DataFrames](https://bamboolib.com)

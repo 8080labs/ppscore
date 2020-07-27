@@ -135,7 +135,22 @@ def test_score():
             duplicate_column_names_df, "unique_column_name", "duplicate_column_name"
         )
 
-    # check tasks
+    # check cross_validation
+    # if more folds than data, there is an error
+    with pytest.raises(ValueError):
+        assert pps.score(df, "x", "y", cross_validation=2000)
+
+    # check random_seed
+    assert pps.score(df, "x", "y", random_seed=1) == pps.score(
+        df, "x", "y", random_seed=1
+    )
+    assert pps.score(df, "x", "y", random_seed=1) != pps.score(
+        df, "x", "y", random_seed=2
+    )
+    # the random seed that is drawn automatically is smaller than <1000
+    assert pps.score(df, "x", "y") != pps.score(df, "x", "y", random_seed=123_456)
+
+    # check task inference
     assert pps.score(df, "x", "y")["task"] == "regression"
     assert pps.score(df, "x", "x_greater_0_string")["task"] == "classification"
     assert pps.score(df, "x", "constant")["task"] == "predict_constant"

@@ -14,13 +14,13 @@ from pandas.api.types import (
     is_timedelta64_dtype,
 )
 
-# if the number is 4, then it is possible to detect patterns when there are at least 4 times the same observation. If the limit is increased, the minimum observations also increase. This is important, because this is the limit when sklearn will throw an error which will lead to a score of 0 if we catch it
-CV_ITERATIONS = 4
 
-RANDOM_SEED = 587136
+NOT_SUPPORTED_ANYMORE = "NOT_SUPPORTED_ANYMORE"
 
 
-def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
+def _calculate_model_cv_score_(
+    df, target, feature, task, cross_validation, random_seed, **kwargs
+):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
     # https://scikit-learn.org/stable/modules/tree.html
@@ -28,12 +28,12 @@ def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
     # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
     metric = task["metric_key"]
     model = task["model"]
-    # shuffle the rows - this is important for crossvalidation
-    # because the crossvalidation just takes the first n lines
+    # shuffle the rows - this is important for cross-validation
+    # because the cross-validation just takes the first n lines
     # if there is a strong pattern in the rows eg 0,0,0,0,1,1,1,1
     # then this will lead to problems because the first cv sees mostly 0 and the later 1
     # this approach might be wrong for timeseries because it might leak information
-    df = df.sample(frac=1, random_state=RANDOM_SEED, replace=False)
+    df = df.sample(frac=1, random_state=random_seed, replace=False)
 
     # preprocess target
     if task["type"] == "classification":
@@ -53,10 +53,10 @@ def _calculate_model_cv_score_(df, target, feature, task, **kwargs):
         # reshaping needed because there is only 1 feature
         feature_input = df[feature].values.reshape(-1, 1)
 
-    # Crossvalidation is stratifiedKFold for classification, KFold for regression
+    # Cross-validation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
     scores = cross_val_score(
-        model, feature_input, target_series, cv=CV_ITERATIONS, scoring=metric
+        model, feature_input, target_series, cv=cross_validation, scoring=metric
     )
 
     return scores.mean()
@@ -74,7 +74,7 @@ def _normalized_mae_score(model_mae, naive_mae):
         return 1 - (model_mae / naive_mae)
 
 
-def _mae_normalizer(df, y, model_score):
+def _mae_normalizer(df, y, model_score, **kwargs):
     "In case of MAE, calculates the baseline score for y and derives the PPS."
     df["naive"] = df[y].median()
     baseline_score = mean_absolute_error(df[y], df["naive"])  # true, pred
@@ -98,12 +98,12 @@ def _normalized_f1_score(model_f1, baseline_f1):
         return f1_diff / scale_range  # 0.1/0.3 = 0.33
 
 
-def _f1_normalizer(df, y, model_score):
+def _f1_normalizer(df, y, model_score, random_seed):
     "In case of F1, calculates the baseline score for y and derives the PPS."
     label_encoder = preprocessing.LabelEncoder()
     df["truth"] = label_encoder.fit_transform(df[y])
     df["most_common_value"] = df["truth"].value_counts().index[0]
-    random = df["truth"].sample(frac=1)
+    random = df["truth"].sample(frac=1, random_state=random_seed)
 
     baseline_score = max(
         f1_score(df["truth"], df["most_common_value"], average="weighted"),
@@ -201,7 +201,7 @@ def _feature_is_id(df, x):
     return category_count == len(df[x])
 
 
-def _maybe_sample(df, sample):
+def _maybe_sample(df, sample, random_seed=None):
     """
     Maybe samples the rows of the given df to have at most ``sample`` rows
     If sample is ``None`` or falsy, there will be no sampling.
@@ -213,6 +213,8 @@ def _maybe_sample(df, sample):
         Dataframe that might be sampled
     sample : int or ``None``
         Number of rows to be sampled
+    random_seed : int or ``None``
+        Random seed that is forwarded to pandas.DataFrame.sample as ``random_state``
 
     Returns
     -------
@@ -222,11 +224,19 @@ def _maybe_sample(df, sample):
     if sample and len(df) > sample:
         # this is a problem if x or y have more than sample=5000 categories
         # TODO: dont sample when the problem occurs and show warning
-        df = df.sample(sample, random_state=RANDOM_SEED, replace=False)
+        df = df.sample(sample, random_state=random_seed, replace=False)
     return df
 
 
-def score(df, x, y, task=None, sample=5000):
+def score(
+    df,
+    x,
+    y,
+    task=NOT_SUPPORTED_ANYMORE,
+    sample=5_000,
+    cross_validation=4,
+    random_seed=None,
+):
     """
     Calculate the Predictive Power Score (PPS) for "x predicts y"
     The score always ranges from 0 to 1 and is data-type agnostic.
@@ -246,6 +256,12 @@ def score(df, x, y, task=None, sample=5000):
     sample : int or ``None``
         Number of rows for sampling. The sampling decreases the calculation time of the PPS.
         If ``None`` there will be no sampling.
+    cross_validation : int
+        Number of iterations during cross-validation. This has the following implications:
+        For example, if the number is 4, then it is possible to detect patterns when there are at least 4 times the same observation. If the limit is increased, the required minimum observations also increase. This is important, because this is the limit when sklearn will throw an error and the PPS cannot be calculated
+    random_seed : int or ``None``
+        Random seed for the parts of the calculation that require random numbers, e.g. shuffling or sampling.
+        If the value is set, the results will be reproducible. If the value is ``None`` a new random number is drawn at the start of each calculation.
 
     Returns
     -------
@@ -274,10 +290,15 @@ def score(df, x, y, task=None, sample=5000):
         raise AssertionError(
             f"The dataframe has {len(df[[y]].columns)} columns with the same column name {y}\nPlease adjust the dataframe and make sure that only 1 column has the name {y}"
         )
-    if task is not None:
+    if task is not NOT_SUPPORTED_ANYMORE:
         raise AttributeError(
             "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
         )
+
+    if random_seed is None:
+        from random import random
+
+        random_seed = int(random() * 1000)
 
     if x == y:
         task_name = "predict_itself"
@@ -288,12 +309,8 @@ def score(df, x, y, task=None, sample=5000):
             raise Exception(
                 "After dropping missing values, there are no valid rows left"
             )
-        df = _maybe_sample(df, sample)
-
-        if task is None:
-            task_name = _infer_task(df, x, y)
-        else:
-            task_name = task
+        df = _maybe_sample(df, sample, random_seed=random_seed)
+        task_name = _infer_task(df, x, y)
 
     task = TASKS[task_name]
 
@@ -310,9 +327,19 @@ def score(df, x, y, task=None, sample=5000):
         ppscore = 0
         baseline_score = 0
     else:
-
-        model_score = _calculate_model_cv_score_(df, target=y, feature=x, task=task)
-        ppscore, baseline_score = task["score_normalizer"](df, y, model_score)
+        model_score = _calculate_model_cv_score_(
+            df,
+            target=y,
+            feature=x,
+            task=task,
+            cross_validation=cross_validation,
+            random_seed=random_seed,
+        )
+        # IDEA: the baseline_scores do sometimes change significantly, e.g. for F1 and thus change the PPS
+        # we might want to calculate the baseline_score 10 times and use the mean in order to have less variance
+        ppscore, baseline_score = task["score_normalizer"](
+            df, y, model_score, random_seed=random_seed
+        )
 
     return {
         "x": x,
@@ -343,7 +370,8 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
     sorted: bool
         Whether or not to sort the output dataframe/list
     kwargs:
-        Other key-word arguments that shall be forwarded to the pps.score method
+        Other key-word arguments that shall be forwarded to the pps.score method,
+        e.g. ``sample``, ``cross_validation``, or ``random_seed``
 
     Returns
     -------
@@ -404,7 +432,8 @@ def matrix(df, output="df", **kwargs):
     output: str - potential values: "df", "dict"
         Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the target column
     kwargs:
-        Other key-word arguments that shall be forwarded to the pps.score method
+        Other key-word arguments that shall be forwarded to the pps.score method,
+        e.g. ``sample``, ``cross_validation``, or ``random_seed``
 
     Returns
     -------
