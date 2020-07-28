@@ -21,8 +21,8 @@ def test__normalized_mae_score():
     assert _normalized_mae_score(5, 10) == 0.5
 
 
-def test__infer_task():
-    from ppscore.calculation import _infer_task
+def test__determine_case_and_prepare_df():
+    from ppscore.calculation import _determine_case_and_prepare_df
 
     df = pd.read_csv("examples/titanic.csv")
     df = df.rename(
@@ -44,23 +44,22 @@ def test__infer_task():
     df["Survived_boolean"] = df["Survived_integer"].astype(bool)
     df["Cabin_string"] = pd.Series(df["Cabin"].apply(str), dtype="string")
 
-    # check special types
-    assert _infer_task(df, "x", "x") == "predict_itself"
-    assert _infer_task(df, "x", "constant") == "predict_constant"
-    assert _infer_task(df, "x", "Name_object_id") == "predict_id"
-
     # check regression
-    assert _infer_task(df, "x", "Age_float") == "regression"
-    assert _infer_task(df, "x", "Pclass_integer") == "regression"
+    assert _determine_case_and_prepare_df(df, "x", "Age_float")[1] == "regression"
+    assert _determine_case_and_prepare_df(df, "x", "Pclass_integer")[1] == "regression"
 
     # check classification
-    assert _infer_task(df, "x", "Pclass_category") == "classification"
-    assert _infer_task(df, "x", "Survived_boolean") == "classification"
-    assert _infer_task(df, "x", "Ticket_object") == "classification"
-    assert _infer_task(df, "x", "Cabin_string") == "classification"
+    assert _determine_case_and_prepare_df(df, "x", "Pclass_category")[1] == "classification"
+    assert _determine_case_and_prepare_df(df, "x", "Survived_boolean")[1] == "classification"
+    assert _determine_case_and_prepare_df(df, "x", "Ticket_object")[1] == "classification"
+    assert _determine_case_and_prepare_df(df, "x", "Cabin_string")[1] == "classification"
 
-    # datetime columns are not supported
-    assert _infer_task(df, "x", "Pclass_datetime") == "unsupported_calculation"
+    # check special cases
+    assert _determine_case_and_prepare_df(df, "Name_object_id", "x")[1] == "feature_is_id"
+    assert _determine_case_and_prepare_df(df, "x", "x")[1] == "predict_itself"
+    assert _determine_case_and_prepare_df(df, "x", "constant")[1] == "target_is_constant"
+    assert _determine_case_and_prepare_df(df, "x", "Name_object_id")[1] == "target_is_id"
+    assert _determine_case_and_prepare_df(df, "x", "Pclass_datetime")[1] == "target_is_datetime"
 
 
 def test__maybe_sample():
@@ -145,14 +144,13 @@ def test_score():
     # the random seed that is drawn automatically is smaller than <1000
     assert pps.score(df, "x", "y") != pps.score(df, "x", "y", random_seed=123_456)
 
-    # check task inference
-    assert pps.score(df, "x", "y")["task"] == "regression"
-    assert pps.score(df, "x", "x_greater_0_string")["task"] == "classification"
-    assert pps.score(df, "x", "constant")["task"] == "predict_constant"
-    assert pps.score(df, "x", "x")["task"] == "predict_itself"
-    assert pps.score(df, "x", "id")["task"] == "predict_id"
-    # After dropping missing values, there are no valid rows left
-    assert pps.score(df, "nan", "y")["task"] == "unsupported_calculation"
+    # check case discrimination
+    assert pps.score(df, "x", "y")["case"] == "regression"
+    assert pps.score(df, "x", "x_greater_0_string")["case"] == "classification"
+    assert pps.score(df, "x", "constant")["case"] == "target_is_constant"
+    assert pps.score(df, "x", "x")["case"] == "predict_itself"
+    assert pps.score(df, "x", "id")["case"] == "target_is_id"
+    assert pps.score(df, "nan", "y")["case"] == "empty_dataframe_after_dropping_na"
 
     # check scores
     # feature is id

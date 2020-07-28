@@ -115,9 +115,10 @@ def _f1_normalizer(df, y, model_score, random_seed):
     return ppscore, baseline_score
 
 
-TASKS = {
+CASES = {
     "regression": {
         "type": "regression",
+        "is_valid_calculation": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
@@ -128,6 +129,7 @@ TASKS = {
     },
     "classification": {
         "type": "classification",
+        "is_valid_calculation": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
@@ -138,6 +140,7 @@ TASKS = {
     },
     "predict_itself": {
         "type": "predict_itself",
+        "is_valid_calculation": True,
         "model_score": 1,
         "baseline_score": 0,
         "ppscore": 1,
@@ -146,8 +149,9 @@ TASKS = {
         "model": None,
         "score_normalizer": None,
     },
-    "predict_constant": {
-        "type": "predict_constant",
+    "target_is_constant": {
+        "type": "target_is_constant",
+        "is_valid_calculation": True,
         "model_score": 1,
         "baseline_score": 1,
         "ppscore": 0,
@@ -156,8 +160,9 @@ TASKS = {
         "model": None,
         "score_normalizer": None,
     },
-    "predict_id": {
-        "type": "predict_id",
+    "target_is_id": {
+        "type": "target_is_id",
+        "is_valid_calculation": True,
         "model_score": 0,
         "baseline_score": 0,
         "ppscore": 0,
@@ -168,6 +173,7 @@ TASKS = {
     },
     "feature_is_id": {
         "type": "feature_is_id",
+        "is_valid_calculation": True,
         "model_score": 0,
         "baseline_score": 0,
         "ppscore": 0,
@@ -176,8 +182,32 @@ TASKS = {
         "model": None,
         "score_normalizer": None,
     },
-    "unsupported_calculation": {
-        "type": "unsupported_calculation",
+    # cases that are invalid_calculations
+    "target_is_datetime": {
+        "type": "target_is_datetime",
+        "is_valid_calculation": False,
+        "model_score": 0,
+        "baseline_score": 0,
+        "ppscore": 0,
+        "metric_name": None,
+        "metric_key": None,
+        "model": None,
+        "score_normalizer": None,
+    },
+    "target_data_type_not_supported": {
+        "type": "target_data_type_not_supported",
+        "is_valid_calculation": False,
+        "model_score": 0,
+        "baseline_score": 0,
+        "ppscore": 0,
+        "metric_name": None,
+        "metric_key": None,
+        "model": None,
+        "score_normalizer": None,
+    },
+    "empty_dataframe_after_dropping_na": {
+        "type": "empty_dataframe_after_dropping_na",
+        "is_valid_calculation": False,
         "model_score": 0,
         "baseline_score": 0,
         "ppscore": 0,
@@ -199,42 +229,58 @@ def _dtype_represents_categories(series) -> bool:
     )
 
 
-def _infer_task(df, x, y):
-    "Returns str with the name of the inferred task based on the columns x and y"
+def _determine_case_and_prepare_df(df, x, y, sample=5_000, random_seed=123):
+    "Returns str with the name of the determined case based on the columns x and y"
     if x == y:
-        return "predict_itself"
+        return df, "predict_itself"
+
+    df = df[[x, y]]
+    # IDEA: log.warning when values have been dropped
+    df = df.dropna()
+
+    if len(df) == 0:
+        return df, "empty_dataframe_after_dropping_na"
+        # IDEA: show warning
+        # raise Exception(
+        #     "After dropping missing values, there are no valid rows left"
+        # )
+
+    df = _maybe_sample(df, sample, random_seed=random_seed)
+
+    if _feature_is_id(df, x):
+        return df, "feature_is_id"
 
     category_count = df[y].value_counts().count()
     if category_count == 1:
         # it is helpful to separate this case in order to save unnecessary calculation time
-        return "predict_constant"
+        return df, "target_is_constant"
     if _dtype_represents_categories(df[y]) and (category_count == len(df[y])):
         # it is important to separate this case in order to save unnecessary calculation time
-        return "predict_id"
+        return df, "target_is_id"
 
     if _dtype_represents_categories(df[y]):
-        return "classification"
+        return df, "classification"
     if is_numeric_dtype(df[y]):
         # this check needs to be after is_bool_dtype (which is part of _dtype_represents_categories) because bool is considered numeric by pandas
-        return "regression"
+        return df, "regression"
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
         # IDEA: show warning
         # raise TypeError(
         #     f"The target column {y} has the dtype {df[y].dtype} which is not supported. A possible solution might be to convert {y} to a string column"
         # )
-        return "unsupported_calculation"
+        return df, "target_is_datetime"
 
     # IDEA: show warning
     # raise Exception(
     #     f"Could not infer a valid task based on the target {y}. The dtype {df[y].dtype} is not yet supported"
     # )  # pragma: no cover
-    return "unsupported_calculation"
+    return df, "target_data_type_not_supported"
 
 
 def _feature_is_id(df, x):
     "Returns Boolean if the feature column x is an ID"
-    if not (is_string_dtype(df[x]) or is_categorical_dtype(df[x])):
+    if not _dtype_represents_categories(df[x]):
         return False
 
     category_count = df[x].value_counts().count()
@@ -340,24 +386,10 @@ def score(
 
         random_seed = int(random() * 1000)
 
-    if x == y:
-        task_name = "predict_itself"
-    else:
-        # IDEA: log.warning when values have been dropped
-        df = df[[x, y]].dropna()
-        if len(df) == 0:
-            task_name = "unsupported_calculation"
-            # IDEA: show warning
-            # raise Exception(
-            #     "After dropping missing values, there are no valid rows left"
-            # )
-        else:
-            df = _maybe_sample(df, sample, random_seed=random_seed)
-            task_name = _infer_task(df, x, y)
+    df, case_type = _determine_case_and_prepare_df(df, x, y, sample=sample, random_seed=random_seed)
+    task = CASES[case_type]
 
-    task = TASKS[task_name]
-
-    if task_name in ["classification", "regression"]:
+    if case_type in ["classification", "regression"]:
         model_score = _calculate_model_cv_score_(
             df,
             target=y,
@@ -379,8 +411,9 @@ def score(
     return {
         "x": x,
         "y": y,
-        "task": task_name,
         "ppscore": ppscore,
+        "case": case_type,
+        "is_valid_calculation": task["is_valid_calculation"],
         "metric": task["metric_name"],
         "baseline_score": baseline_score,
         "model_score": abs(model_score),  # sklearn returns negative mae
@@ -401,12 +434,14 @@ def _format_list_of_dicts(scores, output, sorted):
     if output == "df":
         df_columns = [
             "x",
-            "ppscore",
             "y",
-            "task",
+            "ppscore",
+            "case",
+            "is_valid_calculation",
             "metric",
             "baseline_score",
             "model_score",
+            "model",
         ]
         data = {column: [score[column] for score in scores] for column in df_columns}
         scores = pd.DataFrame.from_dict(data)
