@@ -24,7 +24,7 @@ The PPS is an asymmetric, data-type-agnostic score that can detect linear or non
 From the terminal (or Anaconda prompt in Windows), enter:
 
 ```bash
-pip install ppscore
+pip install -U ppscore
 ```
 
 
