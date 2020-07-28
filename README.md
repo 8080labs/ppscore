@@ -30,6 +30,8 @@ pip install -U ppscore
 
 ## Getting started
 
+> The examples refer to the newest version (1.0.0) of ppscore
+
 First, let's create some data:
 
 ```python
