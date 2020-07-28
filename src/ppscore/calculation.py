@@ -16,6 +16,7 @@ from pandas.api.types import (
 
 
 NOT_SUPPORTED_ANYMORE = "NOT_SUPPORTED_ANYMORE"
+TO_BE_CALCULATED = -1
 
 
 def _calculate_model_cv_score_(
@@ -117,6 +118,9 @@ def _f1_normalizer(df, y, model_score, random_seed):
 TASKS = {
     "regression": {
         "type": "regression",
+        "model_score": TO_BE_CALCULATED,
+        "baseline_score": TO_BE_CALCULATED,
+        "ppscore": TO_BE_CALCULATED,
         "metric_name": "mean absolute error",
         "metric_key": "neg_mean_absolute_error",
         "model": tree.DecisionTreeRegressor(),
@@ -124,6 +128,9 @@ TASKS = {
     },
     "classification": {
         "type": "classification",
+        "model_score": TO_BE_CALCULATED,
+        "baseline_score": TO_BE_CALCULATED,
+        "ppscore": TO_BE_CALCULATED,
         "metric_name": "weighted F1",
         "metric_key": "f1_weighted",
         "model": tree.DecisionTreeClassifier(),
@@ -131,6 +138,9 @@ TASKS = {
     },
     "predict_itself": {
         "type": "predict_itself",
+        "model_score": 1,
+        "baseline_score": 0,
+        "ppscore": 1,
         "metric_name": None,
         "metric_key": None,
         "model": None,
@@ -138,6 +148,9 @@ TASKS = {
     },
     "predict_constant": {
         "type": "predict_constant",
+        "model_score": 1,
+        "baseline_score": 1,
+        "ppscore": 0,
         "metric_name": None,
         "metric_key": None,
         "model": None,
@@ -145,6 +158,29 @@ TASKS = {
     },
     "predict_id": {
         "type": "predict_id",
+        "model_score": 0,
+        "baseline_score": 0,
+        "ppscore": 0,
+        "metric_name": None,
+        "metric_key": None,
+        "model": None,
+        "score_normalizer": None,
+    },
+    "feature_is_id": {
+        "type": "feature_is_id",
+        "model_score": 0,
+        "baseline_score": 0,
+        "ppscore": 0,
+        "metric_name": None,
+        "metric_key": None,
+        "model": None,
+        "score_normalizer": None,
+    },
+    "unsupported_calculation": {
+        "type": "unsupported_calculation",
+        "model_score": 0,
+        "baseline_score": 0,
+        "ppscore": 0,
         "metric_name": None,
         "metric_key": None,
         "model": None,
@@ -183,13 +219,17 @@ def _infer_task(df, x, y):
         return "regression"
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
-        raise TypeError(
-            f"The target column {y} has the dtype {df[y].dtype} which is not supported. A possible solution might be to convert {y} to a string column"
-        )
+        # IDEA: show warning
+        # raise TypeError(
+        #     f"The target column {y} has the dtype {df[y].dtype} which is not supported. A possible solution might be to convert {y} to a string column"
+        # )
+        return "unsupported_calculation"
 
-    raise Exception(
-        f"Could not infer a valid task based on the target {y}. The dtype {df[y].dtype} is not yet supported"
-    )  # pragma: no cover
+    # IDEA: show warning
+    # raise Exception(
+    #     f"Could not infer a valid task based on the target {y}. The dtype {df[y].dtype} is not yet supported"
+    # )  # pragma: no cover
+    return "unsupported_calculation"
 
 
 def _feature_is_id(df, x):
@@ -303,30 +343,21 @@ def score(
     if x == y:
         task_name = "predict_itself"
     else:
-        # TODO: log.warning when values have been dropped
+        # IDEA: log.warning when values have been dropped
         df = df[[x, y]].dropna()
         if len(df) == 0:
-            raise Exception(
-                "After dropping missing values, there are no valid rows left"
-            )
-        df = _maybe_sample(df, sample, random_seed=random_seed)
-        task_name = _infer_task(df, x, y)
+            task_name = "unsupported_calculation"
+            # IDEA: show warning
+            # raise Exception(
+            #     "After dropping missing values, there are no valid rows left"
+            # )
+        else:
+            df = _maybe_sample(df, sample, random_seed=random_seed)
+            task_name = _infer_task(df, x, y)
 
     task = TASKS[task_name]
 
-    if task_name in ["predict_constant", "predict_itself"]:
-        model_score = 1
-        ppscore = 1
-        baseline_score = 1
-    elif task_name == "predict_id":  # target is id
-        model_score = 0
-        ppscore = 0
-        baseline_score = 0
-    elif _feature_is_id(df, x):
-        model_score = 0
-        ppscore = 0
-        baseline_score = 0
-    else:
+    if task_name in ["classification", "regression"]:
         model_score = _calculate_model_cv_score_(
             df,
             target=y,
@@ -340,6 +371,10 @@ def score(
         ppscore, baseline_score = task["score_normalizer"](
             df, y, model_score, random_seed=random_seed
         )
+    else:
+        model_score = task["model_score"]
+        baseline_score = task["baseline_score"]
+        ppscore = task["ppscore"]
 
     return {
         "x": x,
@@ -351,6 +386,32 @@ def score(
         "model_score": abs(model_score),  # sklearn returns negative mae
         "model": task["model"],
     }
+
+
+def _format_list_of_dicts(scores, output, sorted):
+    """
+    Format list of score dicts ``scores``
+    - maybe sort by ppscore
+    - maybe return pandas.Dataframe
+    - output can be one of ["df", "list"]
+    """
+    if sorted:
+        scores.sort(key=lambda item: item["ppscore"], reverse=True)
+
+    if output == "df":
+        df_columns = [
+            "x",
+            "ppscore",
+            "y",
+            "task",
+            "metric",
+            "baseline_score",
+            "model_score",
+        ]
+        data = {column: [score[column] for score in scores] for column in df_columns}
+        scores = pd.DataFrame.from_dict(data)
+
+    return scores
 
 
 def predictors(df, y, output="df", sorted=True, **kwargs):
@@ -365,10 +426,9 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
     y : str
         Name of the column y which acts as the target
     output: str - potential values: "df", "list"
-        Control the type of the output. Either return a df or a dict with all the
-        PPS dicts arranged by the feature columns in df
+        Control the type of the output. Either return a pandas.DataFrame (df) or a list with the score dicts
     sorted: bool
-        Whether or not to sort the output dataframe/list
+        Whether or not to sort the output dataframe/list by the ppscore
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
         e.g. ``sample``, ``cross_validation``, or ``random_seed``
@@ -376,7 +436,7 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
     Returns
     -------
     pandas.DataFrame or list of Dict
-        Either returns a df or a list of all the PPS dicts. This can be influenced
+        Either returns a tidy dataframe or a list of all the PPS dicts. This can be influenced
         by the output argument
     """
     if not isinstance(df, pd.DataFrame):
@@ -402,26 +462,10 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
 
     scores = [score(df, column, y, **kwargs) for column in df if column != y]
 
-    if sorted:
-        scores.sort(key=lambda item: item["ppscore"], reverse=True)
-
-    if output == "df":
-        df_columns = [
-            "x",
-            "ppscore",
-            "y",
-            "task",
-            "metric",
-            "baseline_score",
-            "model_score",
-        ]
-        data = {column: [score[column] for score in scores] for column in df_columns}
-        scores = pd.DataFrame.from_dict(data)
-
-    return scores
+    return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)
 
 
-def matrix(df, output="df", **kwargs):
+def matrix(df, output="df", sorted=False, **kwargs):
     """
     Calculate the Predictive Power Score (PPS) matrix for all columns in the dataframe
 
@@ -429,43 +473,33 @@ def matrix(df, output="df", **kwargs):
     ----------
     df : pandas.DataFrame
         The dataframe that contains the data
-    output: str - potential values: "df", "dict"
-        Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the target column
+    output: str - potential values: "df", "list"
+        Control the type of the output. Either return a pandas.DataFrame (df) or a list with the score dicts
+    sorted: bool
+        Whether or not to sort the output dataframe/list by the ppscore
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
         e.g. ``sample``, ``cross_validation``, or ``random_seed``
 
     Returns
     -------
-    pandas.DataFrame or Dict
-        Either returns a df or a dict with all the PPS dicts arranged by the target column. This can be influenced by the output argument
+    pandas.DataFrame or list of Dict
+        Either returns a tidy dataframe or a list of all the PPS dicts. This can be influenced
+        by the output argument
     """
     if not isinstance(df, pd.DataFrame):
         raise TypeError(
             f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
         )
-    if not output in ["df", "dict"]:
+    if not output in ["df", "list"]:
         raise ValueError(
-            f"""The 'output' argument should be one of ["df", "dict"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
+            f"""The 'output' argument should be one of ["df", "list"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
         )
-    data = {}
-    columns = list(df.columns)
+    if not sorted in [True, False]:
+        raise ValueError(
+            f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
+        )
 
-    for target in columns:
-        scores = []
-        for feature in columns:
-            # single_score = score(df, x=feature, y=target)["ppscore"]
-            try:
-                single_score = score(df, x=feature, y=target, **kwargs)["ppscore"]
-            except:
-                # TODO: log error
-                single_score = 0
-            scores.append(single_score)
-        data[target] = scores
+    scores = [score(df, x, y, **kwargs) for x in df for y in df]
 
-    if output == "df":
-        matrix = pd.DataFrame.from_dict(data, orient="index")
-        matrix.columns = columns
-        return matrix
-    elif output == "dict":
-        return data
+    return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)

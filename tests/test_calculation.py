@@ -60,8 +60,7 @@ def test__infer_task():
     assert _infer_task(df, "x", "Cabin_string") == "classification"
 
     # datetime columns are not supported
-    with pytest.raises(TypeError):
-        pps.score(df, "x", "Pclass_datetime")
+    assert _infer_task(df, "x", "Pclass_datetime") == "unsupported_calculation"
 
 
 def test__maybe_sample():
@@ -115,10 +114,6 @@ def test_score():
     with pytest.raises(ValueError):
         pps.score(df, "x", "y_column_that_does_not_exist")
 
-    with pytest.raises(Exception):
-        # After dropping missing values, there are no valid rows left
-        pps.score(df, "nan", "y")
-
     with pytest.raises(AttributeError):
         # the task argument is not supported any more
         pps.score(df, "x", "y", task="classification")
@@ -156,6 +151,8 @@ def test_score():
     assert pps.score(df, "x", "constant")["task"] == "predict_constant"
     assert pps.score(df, "x", "x")["task"] == "predict_itself"
     assert pps.score(df, "x", "id")["task"] == "predict_id"
+    # After dropping missing values, there are no valid rows left
+    assert pps.score(df, "nan", "y")["task"] == "unsupported_calculation"
 
     # check scores
     # feature is id
@@ -239,6 +236,7 @@ def test_matrix():
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", "Survived"]]
     df["Age_datetime"] = pd.to_datetime(df["Age"], infer_datetime_format=True)
+    subset_df = df[["Survived", "Age_datetime"]]
 
     # check input types
     with pytest.raises(TypeError):
@@ -250,7 +248,12 @@ def test_matrix():
 
     # check return types
     assert isinstance(pps.matrix(df), pd.DataFrame)
-    assert isinstance(pps.matrix(df, output="dict"), dict)
+    assert isinstance(pps.matrix(df, output="list"), list)
 
     # matrix catches single score errors under the hood
-    assert pps.matrix(df[["Survived", "Age_datetime"]])["Survived"]["Age_datetime"] == 0
+    invalid_score = [
+        score
+        for score in pps.matrix(subset_df, output="list")
+        if (score["x"] == "Survived" and score["y"] == "Age_datetime")
+    ][0]
+    assert invalid_score["ppscore"] == 0

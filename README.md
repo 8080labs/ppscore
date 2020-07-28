@@ -49,7 +49,7 @@ Based on the dataframe we can calculate the PPS of x predicting y:
 pps.score(df, "x", "y")
 ```
 
-We can calculate the PPS of all the predictors in the dataframe against a target y
+We can calculate the PPS of all the predictors in the dataframe against a target y:
 
 ```python
 pps.predictors(df, "y")
@@ -61,22 +61,27 @@ Here is how we can calculate the PPS matrix between all columns:
 pps.matrix(df)
 ```
 
-For the visualization of the PPS matrix you might want to use seaborn or your favorite viz library:
+
+### Visualization of the results
+For the visualization of the results you can use seaborn or your favorite viz library.
+
+__Plotting the PPS predictors:__
 
 ```python
 import seaborn as sns
-df_matrix = pps.matrix(df)
-sns.heatmap(df_matrix, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
+predictors_df = pps.predictors(df, y="y")
+sns.barplot(data=predictors_df, x="x", y="ppscore")
 ```
 
-Similarly, we can also plot the predictors
+__Plotting the PPS matrix:__
+
+(This needs some minor preprocessing because seaborn.heatmap unfortunately does not accept tidy data)
 
 ```python
 import seaborn as sns
-df_predictors = pps.predictors(df, y="y")
-sns.barplot(data=df_predictors, x="x", y="ppscore")
+matrix_df = pps.matrix(df)[['x', 'y', 'ppscore']].pivot(columns='x', index='y', values='ppscore')
+sns.heatmap(matrix_df, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
 ```
-
 
 
 ## API
@@ -130,7 +135,7 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
 - __output__ : str - potential values: "df", "list"
     - Control the type of the output. Either return a df or a list with all the PPS score dicts
 - __sorted__ : bool
-    - Whether or not to sort the output dataframe/list
+    - Whether or not to sort the output dataframe/list by the ppscore
 - __kwargs__ :
     - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, or __random_seed__
 
@@ -140,7 +145,7 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
     - Either returns a df or a list of all the PPS dicts. This can be influenced by the output argument
 
 
-### ppscore.matrix(df, output="df", **kwargs)
+### ppscore.matrix(df, output="df", sorted=False, **kwargs)
 
 Calculate the Predictive Power Score (PPS) matrix for all columns in the dataframe
 
@@ -148,8 +153,10 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 
 - __df__ : pandas.DataFrame
     - The dataframe that contains the data
-- __output__ : str - potential values: "df", "dict"
-    - Control the type of the output. Either return a df or a dict with all the PPS dicts arranged by the target column
+- __output__ : str - potential values: "df", "list"
+    - Control the type of the output. Either return a df or a list with all the PPS score dicts
+- __sorted__ : bool
+    - Whether or not to sort the output dataframe/list by the ppscore
 - __kwargs__ :
     - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, or __random_seed__
 
