@@ -49,17 +49,36 @@ def test__determine_case_and_prepare_df():
     assert _determine_case_and_prepare_df(df, "x", "Pclass_integer")[1] == "regression"
 
     # check classification
-    assert _determine_case_and_prepare_df(df, "x", "Pclass_category")[1] == "classification"
-    assert _determine_case_and_prepare_df(df, "x", "Survived_boolean")[1] == "classification"
-    assert _determine_case_and_prepare_df(df, "x", "Ticket_object")[1] == "classification"
-    assert _determine_case_and_prepare_df(df, "x", "Cabin_string")[1] == "classification"
+    assert (
+        _determine_case_and_prepare_df(df, "x", "Pclass_category")[1]
+        == "classification"
+    )
+    assert (
+        _determine_case_and_prepare_df(df, "x", "Survived_boolean")[1]
+        == "classification"
+    )
+    assert (
+        _determine_case_and_prepare_df(df, "x", "Ticket_object")[1] == "classification"
+    )
+    assert (
+        _determine_case_and_prepare_df(df, "x", "Cabin_string")[1] == "classification"
+    )
 
     # check special cases
-    assert _determine_case_and_prepare_df(df, "Name_object_id", "x")[1] == "feature_is_id"
+    assert (
+        _determine_case_and_prepare_df(df, "Name_object_id", "x")[1] == "feature_is_id"
+    )
     assert _determine_case_and_prepare_df(df, "x", "x")[1] == "predict_itself"
-    assert _determine_case_and_prepare_df(df, "x", "constant")[1] == "target_is_constant"
-    assert _determine_case_and_prepare_df(df, "x", "Name_object_id")[1] == "target_is_id"
-    assert _determine_case_and_prepare_df(df, "x", "Pclass_datetime")[1] == "target_is_datetime"
+    assert (
+        _determine_case_and_prepare_df(df, "x", "constant")[1] == "target_is_constant"
+    )
+    assert (
+        _determine_case_and_prepare_df(df, "x", "Name_object_id")[1] == "target_is_id"
+    )
+    assert (
+        _determine_case_and_prepare_df(df, "x", "Pclass_datetime")[1]
+        == "target_is_datetime"
+    )
 
 
 def test__maybe_sample():
@@ -143,6 +162,10 @@ def test_score():
     )
     # the random seed that is drawn automatically is smaller than <1000
     assert pps.score(df, "x", "y") != pps.score(df, "x", "y", random_seed=123_456)
+
+    # check invalid_score
+    invalid_score = -99
+    assert pps.score(df, "nan", "y", invalid_score=invalid_score)["ppscore"] == invalid_score
 
     # check case discrimination
     assert pps.score(df, "x", "y")["case"] == "regression"

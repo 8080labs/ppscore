@@ -86,7 +86,7 @@ sns.heatmap(matrix_df, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
 
 ## API
 
-### ppscore.score(df, x, y, sample=5_000, cross_validation=4, random_seed=None)
+### ppscore.score(df, x, y, sample=5_000, cross_validation=4, random_seed=None, invalid_score=0)
 
 Calculate the Predictive Power Score (PPS) for "x predicts y"
 
@@ -116,6 +116,9 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
 - __random_seed__ : int or ``None``
     - Random seed for the parts of the calculation that require random numbers, e.g. shuffling or sampling.
     If the value is set, the results will be reproducible. If the value is ``None`` a new random number is drawn at the start of each calculation.
+- __invalid_score__ : any
+    - The score that is returned when a calculation is not valid, e.g. because the data type was not supported.
+
 #### Returns
 
 - __Dict__:

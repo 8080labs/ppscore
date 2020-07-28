@@ -115,7 +115,7 @@ def _f1_normalizer(df, y, model_score, random_seed):
     return ppscore, baseline_score
 
 
-CASES = {
+VALID_CALCULATIONS = {
     "regression": {
         "type": "regression",
         "is_valid_calculation": True,
@@ -182,41 +182,13 @@ CASES = {
         "model": None,
         "score_normalizer": None,
     },
-    # cases that are invalid_calculations
-    "target_is_datetime": {
-        "type": "target_is_datetime",
-        "is_valid_calculation": False,
-        "model_score": 0,
-        "baseline_score": 0,
-        "ppscore": 0,
-        "metric_name": None,
-        "metric_key": None,
-        "model": None,
-        "score_normalizer": None,
-    },
-    "target_data_type_not_supported": {
-        "type": "target_data_type_not_supported",
-        "is_valid_calculation": False,
-        "model_score": 0,
-        "baseline_score": 0,
-        "ppscore": 0,
-        "metric_name": None,
-        "metric_key": None,
-        "model": None,
-        "score_normalizer": None,
-    },
-    "empty_dataframe_after_dropping_na": {
-        "type": "empty_dataframe_after_dropping_na",
-        "is_valid_calculation": False,
-        "model_score": 0,
-        "baseline_score": 0,
-        "ppscore": 0,
-        "metric_name": None,
-        "metric_key": None,
-        "model": None,
-        "score_normalizer": None,
-    },
 }
+
+INVALID_CALCULATIONS = [
+    "target_is_datetime",
+    "target_data_type_not_supported",
+    "empty_dataframe_after_dropping_na",
+]
 
 
 def _dtype_represents_categories(series) -> bool:
@@ -322,6 +294,7 @@ def score(
     sample=5_000,
     cross_validation=4,
     random_seed=None,
+    invalid_score=0,
 ):
     """
     Calculate the Predictive Power Score (PPS) for "x predicts y"
@@ -348,6 +321,8 @@ def score(
     random_seed : int or ``None``
         Random seed for the parts of the calculation that require random numbers, e.g. shuffling or sampling.
         If the value is set, the results will be reproducible. If the value is ``None`` a new random number is drawn at the start of each calculation.
+    invalid_score : any
+        The score that is returned when a calculation is invalid, e.g. because the data type was not supported.
 
     Returns
     -------
@@ -386,8 +361,10 @@ def score(
 
         random_seed = int(random() * 1000)
 
-    df, case_type = _determine_case_and_prepare_df(df, x, y, sample=sample, random_seed=random_seed)
-    task = CASES[case_type]
+    df, case_type = _determine_case_and_prepare_df(
+        df, x, y, sample=sample, random_seed=random_seed
+    )
+    task = _get_task(case_type, invalid_score)
 
     if case_type in ["classification", "regression"]:
         model_score = _calculate_model_cv_score_(
@@ -419,6 +396,24 @@ def score(
         "model_score": abs(model_score),  # sklearn returns negative mae
         "model": task["model"],
     }
+
+
+def _get_task(case_type, invalid_score):
+    if case_type in VALID_CALCULATIONS.keys():
+        return VALID_CALCULATIONS[case_type]
+    elif case_type in INVALID_CALCULATIONS:
+        return {
+            "type": case_type,
+            "is_valid_calculation": False,
+            "model_score": invalid_score,
+            "baseline_score": invalid_score,
+            "ppscore": invalid_score,
+            "metric_name": None,
+            "metric_key": None,
+            "model": None,
+            "score_normalizer": None,
+        }
+    raise Exception(f"case_type {case_type} is not supported")
 
 
 def _format_list_of_dicts(scores, output, sorted):
@@ -466,7 +461,7 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Whether or not to sort the output dataframe/list by the ppscore
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
-        e.g. ``sample``, ``cross_validation``, or ``random_seed``
+        e.g. ``sample``, ``cross_validation``, ``random_seed``, ``invalid_score``
 
     Returns
     -------
@@ -514,7 +509,7 @@ def matrix(df, output="df", sorted=False, **kwargs):
         Whether or not to sort the output dataframe/list by the ppscore
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
-        e.g. ``sample``, ``cross_validation``, or ``random_seed``
+        e.g. ``sample``, ``cross_validation``, ``random_seed``, ``invalid_score``
 
     Returns
     -------
