@@ -107,15 +107,15 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
     - Name of the column x which acts as the feature
 - __y__ : str
     - Name of the column y which acts as the target
-- __sample__ : int or ``None``
+- __sample__ : int or `None`
     - Number of rows for sampling. The sampling decreases the calculation time of the PPS.
-    If ``None`` there will be no sampling.
+    If `None` there will be no sampling.
 - __cross_validation__ : int
     - Number of iterations during cross-validation. This has the following implications:
     For example, if the number is 4, then it is possible to detect patterns when there are at least 4 times the same observation. If the limit is increased, the required minimum observations also increase. This is important, because this is the limit when sklearn will throw an error and the PPS cannot be calculated
-- __random_seed__ : int or ``None``
+- __random_seed__ : int or `None`
     - Random seed for the parts of the calculation that require random numbers, e.g. shuffling or sampling.
-    If the value is set, the results will be reproducible. If the value is ``None`` a new random number is drawn at the start of each calculation.
+    If the value is set, the results will be reproducible. If the value is `None` a new random number is drawn at the start of each calculation.
 - __invalid_score__ : any
     - The score that is returned when a calculation is not valid, e.g. because the data type was not supported.
 
@@ -181,7 +181,7 @@ There are multiple ways how you can calculate the PPS. The ppscore package provi
 - In case that the dataset has more than 5,000 rows the score is only calculated on a random subset of 5,000 rows. You can adjust the number of rows or skip this sampling via `sample`. However, in most scenarios the results will be very similar
 - There is no grid search for optimal model parameters
 - The result might change between calculations because the calculation contains random elements, e.g. the sampling of the rows or the shuffling of the rows before cross-validation. If you want to make sure that your results are reproducible you can set the random seed (`random_seed`).
-- If the score cannot be calculated, the package will not raise an error but return an object where ``is_valid_score`` is ``False``. The reported score will be ``invalid_score``. We chose this behavior because we want to give you a quick overview where significant predictive power exists without you having to handle errors or edge cases. However, when you want to explicitly handle the errors, you can still do so.
+- If the score cannot be calculated, the package will not raise an error but return an object where `is_valid_score` is `False`. The reported score will be `invalid_score`. We chose this behavior because we want to give you a quick overview where significant predictive power exists without you having to handle errors or edge cases. However, when you want to explicitly handle the errors, you can still do so.
 
 ### Learning algorithm
 
@@ -210,15 +210,15 @@ However, please note why we actively decided against the following algorithms:
 ### Data preprocessing
 
 Even though the Decision Tree is a very flexible learning algorithm, we need to perform the following preprocessing steps if a column represents categoric values - that means it has the pandas dtype `object`, `category`, `string` or `boolean`.‌
-- If the target column is categoric, we use the ``sklearn.LabelEncoder​``
-- If the feature column is categoric, we use the ``sklearn.OneHotEncoder​``
+- If the target column is categoric, we use the `sklearn.LabelEncoder​`
+- If the feature column is categoric, we use the `sklearn.OneHotEncoder​`
 
 
 ### Choosing the prediction case
 
 > This logic was updated in version 1.0.0.
 
-The choice of the case (``classification`` or ``regression``) has an influence on the final PPS and thus it is important that the correct case is chosen. The case is chosen based on the data types of the columns. That means, e.g. if you want to change the case from ``regression`` to ``classification`` that you have to change the data type from ``float`` to ``string``.
+The choice of the case (`classification` or `regression`) has an influence on the final PPS and thus it is important that the correct case is chosen. The case is chosen based on the data types of the columns. That means, e.g. if you want to change the case from `regression` to `classification` that you have to change the data type from `float` to `string`.
 
 Here are the two main cases:
 - A __classification__ is chosen if the target has the dtype `object`, `category`, `string` or `boolean`
@@ -251,7 +251,7 @@ In the following cases, the PPS is defined but we can save ourselves the computa
 - __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1 because a column can always perfectly predict its own value. Also, this leads to the typical diagonal of 1 that we are used to from the correlation matrix.
 
 #### Invalid scores
-In the following cases, the PPS is not defined and the score is set to ``invalid_score``:
+In the following cases, the PPS is not defined and the score is set to `invalid_score`:
 - __target_is_datetime__ means that the target column has a datetime data type which is not supported. A possible solution might be to convert the target column to a string column.
 - __target_data_type_not_supported__ means that the target column has a data type which is not supported. A possible solution might be to convert the target column to another data type.
 - __empty_dataframe_after_dropping_na__ occurs when there are no valid rows left after rows with missing values have been dropped. A possible solution might be to replace the missing values with valid values.
