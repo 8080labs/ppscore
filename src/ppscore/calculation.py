@@ -118,7 +118,7 @@ def _f1_normalizer(df, y, model_score, random_seed):
 VALID_CALCULATIONS = {
     "regression": {
         "type": "regression",
-        "is_valid_calculation": True,
+        "is_valid_score": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
@@ -129,7 +129,7 @@ VALID_CALCULATIONS = {
     },
     "classification": {
         "type": "classification",
-        "is_valid_calculation": True,
+        "is_valid_score": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
@@ -140,7 +140,7 @@ VALID_CALCULATIONS = {
     },
     "predict_itself": {
         "type": "predict_itself",
-        "is_valid_calculation": True,
+        "is_valid_score": True,
         "model_score": 1,
         "baseline_score": 0,
         "ppscore": 1,
@@ -151,7 +151,7 @@ VALID_CALCULATIONS = {
     },
     "target_is_constant": {
         "type": "target_is_constant",
-        "is_valid_calculation": True,
+        "is_valid_score": True,
         "model_score": 1,
         "baseline_score": 1,
         "ppscore": 0,
@@ -162,7 +162,7 @@ VALID_CALCULATIONS = {
     },
     "target_is_id": {
         "type": "target_is_id",
-        "is_valid_calculation": True,
+        "is_valid_score": True,
         "model_score": 0,
         "baseline_score": 0,
         "ppscore": 0,
@@ -173,7 +173,7 @@ VALID_CALCULATIONS = {
     },
     "feature_is_id": {
         "type": "feature_is_id",
-        "is_valid_calculation": True,
+        "is_valid_score": True,
         "model_score": 0,
         "baseline_score": 0,
         "ppscore": 0,
@@ -390,7 +390,7 @@ def score(
         "y": y,
         "ppscore": ppscore,
         "case": case_type,
-        "is_valid_calculation": task["is_valid_calculation"],
+        "is_valid_score": task["is_valid_score"],
         "metric": task["metric_name"],
         "baseline_score": baseline_score,
         "model_score": abs(model_score),  # sklearn returns negative mae
@@ -404,7 +404,7 @@ def _get_task(case_type, invalid_score):
     elif case_type in INVALID_CALCULATIONS:
         return {
             "type": case_type,
-            "is_valid_calculation": False,
+            "is_valid_score": False,
             "model_score": invalid_score,
             "baseline_score": invalid_score,
             "ppscore": invalid_score,
@@ -432,7 +432,7 @@ def _format_list_of_dicts(scores, output, sorted):
             "y",
             "ppscore",
             "case",
-            "is_valid_calculation",
+            "is_valid_score",
             "metric",
             "baseline_score",
             "model_score",

@@ -144,7 +144,7 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
 
 #### Returns
 
-- __pandas.DataFrame__ or list of PPS dict:
+- __pandas.DataFrame__ or list of PPS dicts:
     - Either returns a df or a list of all the PPS dicts. This can be influenced by the output argument
 
 
@@ -165,8 +165,8 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 
 #### Returns
 
-- __pandas.DataFrame__ or __Dict__:
-    - Either returns a df or a dict with all the PPS dicts arranged by the target column. This can be influenced by the output argument
+- __pandas.DataFrame__ or list of PPS dicts:
+    - Either returns a df or a list of all the PPS dicts. This can be influenced by the output argument
 
 
 ## Calculation of the PPS
@@ -176,12 +176,12 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 There are multiple ways how you can calculate the PPS. The ppscore package provides a sample implementation that is based on the following calculations:
 
 - The score is calculated using only 1 feature trying to predict the target column. This means there are no interaction effects between the scores of various features. Note that this is in contrast to feature importance
-- The score is calculated on the test sets of a 4-fold cross-validation (number is adjustable via `cross_validation`). For classification, stratifiedKFold is used. For regression, normal KFold. Please note that this sampling might not be valid for time series data sets
+- The score is calculated on the test sets of a 4-fold cross-validation (number is adjustable via `cross_validation`). For classification, stratifiedKFold is used. For regression, normal KFold. Please note that __this sampling might not be valid for time series data sets__
 - All rows which have a missing value in the feature or the target column are dropped
-- In case that the dataset has more than 5,000 rows the score is only calculated on a random subset of 5,000 rows. You can adjust the number of rows or skip this sampling via the API (`sample`). However, in most scenarios the results will be very similar
+- In case that the dataset has more than 5,000 rows the score is only calculated on a random subset of 5,000 rows. You can adjust the number of rows or skip this sampling via `sample`. However, in most scenarios the results will be very similar
 - There is no grid search for optimal model parameters
 - The result might change between calculations because the calculation contains random elements, e.g. the sampling of the rows or the shuffling of the rows before cross-validation. If you want to make sure that your results are reproducible you can set the random seed (`random_seed`).
-
+- If the score cannot be calculated, the package will not raise an error but return an object where ``is_valid_score`` is ``False``. The reported score will be ``invalid_score``. We chose this behavior because we want to give you a quick overview where significant predictive power exists without you having to handle errors or edge cases. However, when you want to explicitly handle the errors, you can still do so.
 
 ### Learning algorithm
 
@@ -210,29 +210,24 @@ However, please note why we actively decided against the following algorithms:
 ### Data preprocessing
 
 Even though the Decision Tree is a very flexible learning algorithm, we need to perform the following preprocessing steps if a column represents categoric values - that means it has the pandas dtype `object`, `category`, `string` or `boolean`.‌
-- If the target column is categoric, we use the sklearn.LabelEncoder​
-- If the feature column is categoric, we use the sklearn.OneHotEncoder​
+- If the target column is categoric, we use the ``sklearn.LabelEncoder​``
+- If the feature column is categoric, we use the ``sklearn.OneHotEncoder​``
 
 
-### Inference of the prediction task
+### Choosing the prediction case
 
 > This logic was updated in version 1.0.0.
 
-The choice of the task (classification or regression) has an influence on the final PPS and thus it is important that the correct task is chosen. The task is chosen based on the data types of the columns. That means, e.g. if you want to change the task from "regression" to "classification" that you have to change the data type from "float" to "string".
+The choice of the case (``classification`` or ``regression``) has an influence on the final PPS and thus it is important that the correct case is chosen. The case is chosen based on the data types of the columns. That means, e.g. if you want to change the case from ``regression`` to ``classification`` that you have to change the data type from ``float`` to ``string``.
 
-Here are the two main tasks:
-- A __classification__ is inferred if the target has the dtype `object`, `category`, `string` or `boolean`
-- A __regression__ is inferred if the target has the dtype `float` or `int`
-
-In addition, there are the following 3 special tasks which save considerable calculation time:
-- __predict_id__ means that the target column is categoric (see above for __classification__) and that all categories appear only once. Thus, the PPS is 0
-- __predict_constant__ means that the target column only has a single value and thus the PPS is 1
-- __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1
+Here are the two main cases:
+- A __classification__ is chosen if the target has the dtype `object`, `category`, `string` or `boolean`
+- A __regression__ is chosen if the target has the dtype `float` or `int`
 
 
-### Tasks and their score metrics​
+### Cases and their score metrics​
 
-Each task uses a different evaluation score for calculating the final predictive power score (PPS).
+Each case uses a different evaluation score for calculating the final predictive power score (PPS).
 
 #### Regression
 
@@ -244,12 +239,23 @@ In case of an regression, the ppscore uses the mean absolute error (MAE) as the 
 If the task is a classification, we compute the weighted F1 score (wF1) as the underlying evaluation metric (F1_model). The F1 score can be interpreted as a weighted average of the precision and recall, where an F1 score reaches its best value at 1 and worst score at 0. The relative contribution of precision and recall to the F1 score are equal. The weighted F1 takes into account the precision and recall of all classes weighted by their support as described [here](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html). As a baseline score (F1_naive), we calculate the weighted F1 score for a model that always predicts the most common class of the target column (F1_most_common) and a model that predicts random values (F1_random). F1_naive is set to the maximum of F1_most_common and F1_random. The PPS is the result of the following normalization (and never smaller than 0):
 > PPS = (F1_model - F1_naive) / (1 - F1_naive)
 
-#### Special tasks
+### Special cases
 
-The special tasks all have predefined PPS scores. Those tasks exist for implementation reasons in order to communicate special cases and save computation time.
-- __predict_id__ has a score of 0 because an ID column cannot be predicted by any other column as part of a cross-validation. There still might be a 1 to 1 relationship but this is not detectable by the current implementation of the PPS.
-- __predict_constant__ has a score of 1 because any column and baseline can perfectly predict a column that only has a single value. It could be argued that the score should be 0 because the model is not better than the naive predictor. However, (so far) we chose to set a value of 1 in order to communicate that there is perfect predictive power.
-- __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1 because a column can always perfectly predict its own value.
+There are various cases in which the PPS can be defined without fitting a model to save computation time or in which the PPS cannot be calculated at all. Those cases are described below.
+
+#### Valid scores
+In the following cases, the PPS is defined but we can save ourselves the computation time:
+- __feature_is_id__ means that the feature column is categoric (see above for __classification__) and that all categories appear only once. Such a feature can never predict a target during cross-validation and thus the PPS is 0.
+- __target_is_id__ means that the target column is categoric (see above for __classification__) and that all categories appear only once. Thus, the PPS is 0 because an ID column cannot be predicted by any other column as part of a cross-validation. There still might be a 1 to 1 relationship but this is not detectable by the current implementation of the PPS.
+- __target_is_constant__ means that the target column only has a single value and thus the PPS is 0 because any column and baseline can perfectly predict a column that only has a single value. Therefore, the feature does not add any predictive power and we want to communicate that.
+- __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1 because a column can always perfectly predict its own value. Also, this leads to the typical diagonal of 1 that we are used to from the correlation matrix.
+
+#### Invalid scores
+In the following cases, the PPS is not defined and the score is set to ``invalid_score``:
+- __target_is_datetime__ means that the target column has a datetime data type which is not supported. A possible solution might be to convert the target column to a string column.
+- __target_data_type_not_supported__ means that the target column has a data type which is not supported. A possible solution might be to convert the target column to another data type.
+- __empty_dataframe_after_dropping_na__ occurs when there are no valid rows left after rows with missing values have been dropped. A possible solution might be to replace the missing values with valid values.
+
 
 ## About
 ppscore is developed by [8080 Labs](https://8080labs.com) - we create tools for Python Data Scientists. If you like `ppscore` you might want to check out our other project [bamboolib - a GUI for pandas DataFrames](https://bamboolib.com)
