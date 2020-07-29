@@ -8,7 +8,12 @@ import ppscore as pps
 
 # %%
 def heatmap(df):
-    return sns.heatmap(df, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
+    df = df[['x', 'y', 'ppscore']].pivot(columns='x', index='y', values='ppscore')
+    ax = sns.heatmap(df, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
+    ax.set_title("PPS matrix")
+    ax.set_xlabel("feature")
+    ax.set_ylabel("target")
+    return ax
 
 
 # %%
