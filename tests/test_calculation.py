@@ -165,7 +165,10 @@ def test_score():
 
     # check invalid_score
     invalid_score = -99
-    assert pps.score(df, "nan", "y", invalid_score=invalid_score)["ppscore"] == invalid_score
+    assert (
+        pps.score(df, "nan", "y", invalid_score=invalid_score)["ppscore"]
+        == invalid_score
+    )
 
     # check case discrimination
     assert pps.score(df, "x", "y")["case"] == "regression"
