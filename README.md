@@ -30,7 +30,7 @@ pip install -U ppscore
 
 ## Getting started
 
-> The examples refer to the newest version (1.0.0) of ppscore
+> The examples refer to the newest version (1.0.0) of ppscore. [See changes](https://github.com/8080labs/ppscore/blob/master/CHANGELOG.md)
 
 First, let's create some data:
 
