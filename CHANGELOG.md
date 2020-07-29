@@ -12,3 +12,4 @@ __Improvements:__
 - Added new kwargs to `pps.score` e.g. `cross_validation`, `random_seed` and `invalid_score`
 - Added error messages when the input arguments are invalid
 - Added more tests
+- Added CHANGELOG
