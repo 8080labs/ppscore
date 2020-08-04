@@ -4,7 +4,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Master] (unreleased)
 __Improvements:__
-- Improve error message when using the wrong API (#31)
+- Improve error message when using the wrong API ([#31](https://github.com/8080labs/ppscore/issues/31))
 
 ## [1.0.0]
 __Breaking changes:__
