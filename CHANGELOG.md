@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Master] (unreleased)
+__Improvements:__
+- Improve error message when using the wrong API (#31)
+
 ## [1.0.0]
 __Breaking changes:__
 - The case of the calculation for `regression` or `classification` __only depends on the data types__ and not the cardinality of a column any more. Also, it is not possible any more to pass the `task` to `pps.score`. This removes confusion about the inference of the final task. Some other special cases like `feature_is_id` still review the cardinality of a column.

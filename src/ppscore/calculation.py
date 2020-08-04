@@ -286,6 +286,13 @@ def _maybe_sample(df, sample, random_seed=None):
     return df
 
 
+def _is_column_in_df(column, df):
+    try:
+        return column in df.columns
+    except:
+        return False
+
+
 def score(
     df,
     x,
@@ -335,17 +342,17 @@ def score(
         raise TypeError(
             f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
         )
-    if not x in df.columns:
+    if not _is_column_in_df(x, df):
         raise ValueError(
-            f"The 'x' argument should be the name of a dataframe column but the name that you passed ({x}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+            f"The 'x' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
         )
     if len(df[[x]].columns) >= 2:
         raise AssertionError(
             f"The dataframe has {len(df[[x]].columns)} columns with the same column name {x}\nPlease adjust the dataframe and make sure that only 1 column has the name {x}"
         )
-    if not y in df.columns:
+    if not _is_column_in_df(y, df):
         raise ValueError(
-            f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+            f"The 'y' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
         )
     if len(df[[y]].columns) >= 2:
         raise AssertionError(
@@ -473,9 +480,9 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         raise TypeError(
             f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
         )
-    if not y in df.columns:
+    if not _is_column_in_df(y, df):
         raise ValueError(
-            f"The 'y' argument should be the name of a dataframe column but the name that you passed ({y}) is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+            f"The 'y' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
         )
     if len(df[[y]].columns) >= 2:
         raise AssertionError(
