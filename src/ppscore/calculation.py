@@ -300,7 +300,7 @@ def score(
     task=NOT_SUPPORTED_ANYMORE,
     sample=5_000,
     cross_validation=4,
-    random_seed=None,
+    random_seed=123,
     invalid_score=0,
 ):
     """
