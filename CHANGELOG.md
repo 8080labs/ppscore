@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Master] (unreleased)
+## [dev] (unreleased)
 __Improvements:__
 - Improve error message when using the wrong API ([#31](https://github.com/8080labs/ppscore/issues/31))
 
