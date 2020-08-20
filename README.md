@@ -121,7 +121,7 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
 - __invalid_score__ : any
     - The score that is returned when a calculation is not valid, e.g. because the data type was not supported.
 - __catch_errors__ : bool
-    - If `True` errors will be catched and reported as invalid_score which ensures convenience. If `False` errors will be raised. This is helpful for inspecting and debugging errors.
+    - If `True` all errors will be catched and reported as `unknown_error` which ensures convenience. If `False` errors will be raised. This is helpful for inspecting and debugging errors.
 
 
 #### Returns
