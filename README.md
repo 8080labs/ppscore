@@ -120,6 +120,9 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
     If the value is set, the results will be reproducible. If the value is `None` a new random number is drawn at the start of each calculation.
 - __invalid_score__ : any
     - The score that is returned when a calculation is not valid, e.g. because the data type was not supported.
+- __catch_errors__ : bool
+    - If `True` errors will be catched and reported as invalid_score which ensures convenience. If `False` errors will be raised. This is helpful for inspecting and debugging errors.
+
 
 #### Returns
 
@@ -142,7 +145,7 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
 - __sorted__ : bool
     - Whether or not to sort the output dataframe/list by the ppscore
 - __kwargs__ :
-    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, or __random_seed__
+    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, __random_seed__, __invalid_score__, __catch_errors__
 
 #### Returns
 
@@ -163,7 +166,7 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 - __sorted__ : bool
     - Whether or not to sort the output dataframe/list by the ppscore
 - __kwargs__ :
-    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, or __random_seed__
+    - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, __random_seed__, __invalid_score__, __catch_errors__
 
 #### Returns
 
@@ -252,11 +255,12 @@ In the following cases, the PPS is defined but we can save ourselves the computa
 - __target_is_constant__ means that the target column only has a single value and thus the PPS is 0 because any column and baseline can perfectly predict a column that only has a single value. Therefore, the feature does not add any predictive power and we want to communicate that.
 - __predict_itself__ means that the feature and target columns are the same and thus the PPS is 1 because a column can always perfectly predict its own value. Also, this leads to the typical diagonal of 1 that we are used to from the correlation matrix.
 
-#### Invalid scores
+#### Invalid scores and other errors
 In the following cases, the PPS is not defined and the score is set to `invalid_score`:
 - __target_is_datetime__ means that the target column has a datetime data type which is not supported. A possible solution might be to convert the target column to a string column.
 - __target_data_type_not_supported__ means that the target column has a data type which is not supported. A possible solution might be to convert the target column to another data type.
 - __empty_dataframe_after_dropping_na__ occurs when there are no valid rows left after rows with missing values have been dropped. A possible solution might be to replace the missing values with valid values.
+- Last but not least, __unknown_error__ occurs for all other errors that might raise an exception. This case is only reported when `catch_errors` is `True`. If you want to inspect or debug the underlying error, please set `catch_errors` to `False`.
 
 
 ## About

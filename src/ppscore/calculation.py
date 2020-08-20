@@ -188,6 +188,7 @@ INVALID_CALCULATIONS = [
     "target_is_datetime",
     "target_data_type_not_supported",
     "empty_dataframe_after_dropping_na",
+    "unknown_error",
 ]
 
 
@@ -261,18 +262,18 @@ def _feature_is_id(df, x):
 
 def _maybe_sample(df, sample, random_seed=None):
     """
-    Maybe samples the rows of the given df to have at most ``sample`` rows
-    If sample is ``None`` or falsy, there will be no sampling.
+    Maybe samples the rows of the given df to have at most `sample` rows
+    If sample is `None` or falsy, there will be no sampling.
     If the df has fewer rows than the sample, there will be no sampling.
 
     Parameters
     ----------
     df : pandas.DataFrame
         Dataframe that might be sampled
-    sample : int or ``None``
+    sample : int or `None`
         Number of rows to be sampled
-    random_seed : int or ``None``
-        Random seed that is forwarded to pandas.DataFrame.sample as ``random_state``
+    random_seed : int or `None`
+        Random seed that is forwarded to pandas.DataFrame.sample as `random_state`
 
     Returns
     -------
@@ -293,6 +294,46 @@ def _is_column_in_df(column, df):
         return False
 
 
+def _score(
+    df, x, y, task, sample, cross_validation, random_seed, invalid_score, catch_errors
+):
+    df, case_type = _determine_case_and_prepare_df(
+        df, x, y, sample=sample, random_seed=random_seed
+    )
+    task = _get_task(case_type, invalid_score)
+
+    if case_type in ["classification", "regression"]:
+        model_score = _calculate_model_cv_score_(
+            df,
+            target=y,
+            feature=x,
+            task=task,
+            cross_validation=cross_validation,
+            random_seed=random_seed,
+        )
+        # IDEA: the baseline_scores do sometimes change significantly, e.g. for F1 and thus change the PPS
+        # we might want to calculate the baseline_score 10 times and use the mean in order to have less variance
+        ppscore, baseline_score = task["score_normalizer"](
+            df, y, model_score, random_seed=random_seed
+        )
+    else:
+        model_score = task["model_score"]
+        baseline_score = task["baseline_score"]
+        ppscore = task["ppscore"]
+
+    return {
+        "x": x,
+        "y": y,
+        "ppscore": ppscore,
+        "case": case_type,
+        "is_valid_score": task["is_valid_score"],
+        "metric": task["metric_name"],
+        "baseline_score": baseline_score,
+        "model_score": abs(model_score),  # sklearn returns negative mae
+        "model": task["model"],
+    }
+
+
 def score(
     df,
     x,
@@ -302,6 +343,7 @@ def score(
     cross_validation=4,
     random_seed=123,
     invalid_score=0,
+    catch_errors=True,
 ):
     """
     Calculate the Predictive Power Score (PPS) for "x predicts y"
@@ -319,17 +361,19 @@ def score(
         Name of the column x which acts as the feature
     y : str
         Name of the column y which acts as the target
-    sample : int or ``None``
+    sample : int or `None`
         Number of rows for sampling. The sampling decreases the calculation time of the PPS.
-        If ``None`` there will be no sampling.
+        If `None` there will be no sampling.
     cross_validation : int
         Number of iterations during cross-validation. This has the following implications:
         For example, if the number is 4, then it is possible to detect patterns when there are at least 4 times the same observation. If the limit is increased, the required minimum observations also increase. This is important, because this is the limit when sklearn will throw an error and the PPS cannot be calculated
-    random_seed : int or ``None``
+    random_seed : int or `None`
         Random seed for the parts of the calculation that require random numbers, e.g. shuffling or sampling.
-        If the value is set, the results will be reproducible. If the value is ``None`` a new random number is drawn at the start of each calculation.
+        If the value is set, the results will be reproducible. If the value is `None` a new random number is drawn at the start of each calculation.
     invalid_score : any
         The score that is returned when a calculation is invalid, e.g. because the data type was not supported.
+    catch_errors : bool
+        If `True` all errors will be catched and reported as `unknown_error` which ensures convenience. If `False` errors will be raised. This is helpful for inspecting and debugging errors.
 
     Returns
     -------
@@ -368,41 +412,35 @@ def score(
 
         random_seed = int(random() * 1000)
 
-    df, case_type = _determine_case_and_prepare_df(
-        df, x, y, sample=sample, random_seed=random_seed
-    )
-    task = _get_task(case_type, invalid_score)
-
-    if case_type in ["classification", "regression"]:
-        model_score = _calculate_model_cv_score_(
+    try:
+        return _score(
             df,
-            target=y,
-            feature=x,
-            task=task,
-            cross_validation=cross_validation,
-            random_seed=random_seed,
+            x,
+            y,
+            task,
+            sample,
+            cross_validation,
+            random_seed,
+            invalid_score,
+            catch_errors,
         )
-        # IDEA: the baseline_scores do sometimes change significantly, e.g. for F1 and thus change the PPS
-        # we might want to calculate the baseline_score 10 times and use the mean in order to have less variance
-        ppscore, baseline_score = task["score_normalizer"](
-            df, y, model_score, random_seed=random_seed
-        )
-    else:
-        model_score = task["model_score"]
-        baseline_score = task["baseline_score"]
-        ppscore = task["ppscore"]
-
-    return {
-        "x": x,
-        "y": y,
-        "ppscore": ppscore,
-        "case": case_type,
-        "is_valid_score": task["is_valid_score"],
-        "metric": task["metric_name"],
-        "baseline_score": baseline_score,
-        "model_score": abs(model_score),  # sklearn returns negative mae
-        "model": task["model"],
-    }
+    except Exception as exception:
+        if catch_errors:
+            case_type = "unknown_error"
+            task = _get_task(case_type, invalid_score)
+            return {
+                "x": x,
+                "y": y,
+                "ppscore": task["ppscore"],
+                "case": case_type,
+                "is_valid_score": task["is_valid_score"],
+                "metric": task["metric_name"],
+                "baseline_score": task["baseline_score"],
+                "model_score": task["model_score"],  # sklearn returns negative mae
+                "model": task["model"],
+            }
+        else:
+            raise exception
 
 
 def _get_task(case_type, invalid_score):
@@ -425,7 +463,7 @@ def _get_task(case_type, invalid_score):
 
 def _format_list_of_dicts(scores, output, sorted):
     """
-    Format list of score dicts ``scores``
+    Format list of score dicts `scores`
     - maybe sort by ppscore
     - maybe return pandas.Dataframe
     - output can be one of ["df", "list"]
@@ -468,7 +506,7 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Whether or not to sort the output dataframe/list by the ppscore
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
-        e.g. ``sample``, ``cross_validation``, ``random_seed``, ``invalid_score``
+        e.g. `sample, `cross_validation, `random_seed, `invalid_score`, `catch_errors`
 
     Returns
     -------
@@ -516,7 +554,7 @@ def matrix(df, output="df", sorted=False, **kwargs):
         Whether or not to sort the output dataframe/list by the ppscore
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
-        e.g. ``sample``, ``cross_validation``, ``random_seed``, ``invalid_score``
+        e.g. `sample, `cross_validation, `random_seed, `invalid_score`, `catch_errors`
 
     Returns
     -------

@@ -151,7 +151,7 @@ def test_score():
     # check cross_validation
     # if more folds than data, there is an error
     with pytest.raises(ValueError):
-        assert pps.score(df, "x", "y", cross_validation=2000)
+        assert pps.score(df, "x", "y", cross_validation=2000, catch_errors=False)
 
     # check random_seed
     assert pps.score(df, "x", "y", random_seed=1) == pps.score(
@@ -169,6 +169,9 @@ def test_score():
         pps.score(df, "nan", "y", invalid_score=invalid_score)["ppscore"]
         == invalid_score
     )
+
+    # check catch_errors using the cross_validation error from above
+    assert pps.score(df, "x", "y", cross_validation=2000, invalid_score=invalid_score, catch_errors=True)["ppscore"] == invalid_score
 
     # check case discrimination
     assert pps.score(df, "x", "y")["case"] == "regression"
