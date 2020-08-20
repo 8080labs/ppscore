@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [dev] (unreleased)
+- ...
+
+## [1.1.0]
 __Default changes:__
 - In `pps.score` changed the default of `random_seed` to `123` in order to enable reproducible results when comparing scores that are generated via `pps.score` or `pps.matrix`. The old behavior of drawing a random_seed per default was confusing. ([#32](https://github.com/8080labs/ppscore/issues/32))
 
