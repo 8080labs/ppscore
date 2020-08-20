@@ -88,7 +88,7 @@ sns.heatmap(matrix_df, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
 
 ## API
 
-### ppscore.score(df, x, y, sample=5_000, cross_validation=4, random_seed=123, invalid_score=0)
+### ppscore.score(df, x, y, sample=5_000, cross_validation=4, random_seed=123, invalid_score=0, catch_errors=True)
 
 Calculate the Predictive Power Score (PPS) for "x predicts y"
 
