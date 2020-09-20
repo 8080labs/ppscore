@@ -18,6 +18,43 @@ from pandas.api.types import (
 NOT_SUPPORTED_ANYMORE = "NOT_SUPPORTED_ANYMORE"
 TO_BE_CALCULATED = -1
 
+import pandas as pd
+class Check_Error:
+    def __init__(self,df,x='',y='',task = NOT_SUPPORTED_ANYMORE):
+        self.df = df
+        self.x = x
+        self.y = y
+        self.task = task
+    def is_instance(self):
+         if not isinstance(self.df, pd.DataFrame):
+             raise TypeError(
+                    f"The 'df' argument should be a pandas.DataFrame but you passed a {type(self.df)}\nPlease convert your input to a pandas.DataFrame"
+                )
+    def is_col_in_df(self,target=False):
+            if target:
+                if not _is_column_in_df(self.y, self.df):
+                    raise ValueError(
+                    f"The 'y' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+                    )
+            else:
+                if not _is_column_in_df(self.x, self.df):
+                    raise ValueError(
+                        f"The 'x' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
+                    )
+    def duplicate_cols(self,target = False):                     
+        if target==False and len(self.df[[self.x]].columns) >= 2:
+            raise AssertionError(
+                f"The dataframe has {len(self.df[[self.x]].columns)} columns with the same column name {self.x}\nPlease adjust the dataframe and make sure that only 1 column has the name {self.x}"
+            )
+        if target==True and len(self.df[[self.y]].columns) >= 2:
+            raise AssertionError(
+                f"The dataframe has {len(self.df[[self.y]].columns)} columns with the same column name {self.y}\nPlease adjust the dataframe and make sure that only 1 column has the name {self.y}"
+            )
+    def task_support(self):
+        if self.task is not NOT_SUPPORTED_ANYMORE:
+            raise AttributeError(
+                "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
+            )
 
 def _calculate_model_cv_score_(
     df, target, feature, task, cross_validation, random_seed, **kwargs
@@ -381,31 +418,13 @@ def score(
         A dict that contains multiple fields about the resulting PPS.
         The dict enables introspection into the calculations that have been performed under the hood
     """
-
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError(
-            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
-        )
-    if not _is_column_in_df(x, df):
-        raise ValueError(
-            f"The 'x' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
-        )
-    if len(df[[x]].columns) >= 2:
-        raise AssertionError(
-            f"The dataframe has {len(df[[x]].columns)} columns with the same column name {x}\nPlease adjust the dataframe and make sure that only 1 column has the name {x}"
-        )
-    if not _is_column_in_df(y, df):
-        raise ValueError(
-            f"The 'y' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
-        )
-    if len(df[[y]].columns) >= 2:
-        raise AssertionError(
-            f"The dataframe has {len(df[[y]].columns)} columns with the same column name {y}\nPlease adjust the dataframe and make sure that only 1 column has the name {y}"
-        )
-    if task is not NOT_SUPPORTED_ANYMORE:
-        raise AttributeError(
-            "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
-        )
+    err_check = Check_Error(df,x,y,task)
+    err_check.is_instance()
+    err_check.is_col_in_df(False)
+    err_check.duplicate_cols(False)
+    err_check.is_col_in_df(True)
+    err_check.duplicate_cols(True)
+    err_check.task_support()
 
     if random_seed is None:
         from random import random
@@ -514,18 +533,10 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Either returns a tidy dataframe or a list of all the PPS dicts. This can be influenced
         by the output argument
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError(
-            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
-        )
-    if not _is_column_in_df(y, df):
-        raise ValueError(
-            f"The 'y' argument should be the name of a dataframe column but the variable that you passed is not a column in the given dataframe.\nPlease review the column name or your dataframe"
-        )
-    if len(df[[y]].columns) >= 2:
-        raise AssertionError(
-            f"The dataframe has {len(df[[y]].columns)} columns with the same column name {y}\nPlease adjust the dataframe and make sure that only 1 column has the name {y}"
-        )
+    err_check = Check_Error(df, y=y)
+    err_check.is_instance()
+    err_check.is_col_in_df(True)
+    err_check.duplicate_cols(True)
     if not output in ["df", "list"]:
         raise ValueError(
             f"""The 'output' argument should be one of ["df", "list"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
@@ -562,10 +573,9 @@ def matrix(df, output="df", sorted=False, **kwargs):
         Either returns a tidy dataframe or a list of all the PPS dicts. This can be influenced
         by the output argument
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError(
-            f"The 'df' argument should be a pandas.DataFrame but you passed a {type(df)}\nPlease convert your input to a pandas.DataFrame"
-        )
+
+    err_check = Check_Error(df)
+    err_check.is_instance()
     if not output in ["df", "list"]:
         raise ValueError(
             f"""The 'output' argument should be one of ["df", "list"] but you passed: {output}\nPlease adjust your input to one of the valid values"""
