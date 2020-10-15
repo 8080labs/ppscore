@@ -262,6 +262,8 @@ In the following cases, the PPS is not defined and the score is set to `invalid_
 - __empty_dataframe_after_dropping_na__ occurs when there are no valid rows left after rows with missing values have been dropped. A possible solution might be to replace the missing values with valid values.
 - Last but not least, __unknown_error__ occurs for all other errors that might raise an exception. This case is only reported when `catch_errors` is `True`. If you want to inspect or debug the underlying error, please set `catch_errors` to `False`.
 
+## Citing ppscore
+[![DOI](https://zenodo.org/badge/256518683.svg)](https://zenodo.org/badge/latestdoi/256518683)
 
 ## About
 ppscore is developed by [8080 Labs](https://8080labs.com) - we create tools for Python Data Scientists. If you like `ppscore` you might want to check out our other project [bamboolib - a GUI for pandas DataFrames](https://bamboolib.com)
