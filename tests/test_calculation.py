@@ -259,7 +259,8 @@ def test_predictors():
     # the underlying calculations are tested as part of test_score
 
 
-def test_matrix():
+@pytest.mark.parametrize("n_jobs", [1, 2])
+def test_matrix(n_jobs):
     df = pd.read_csv("examples/titanic.csv")
     df = df[["Age", "Survived"]]
     df["Age_datetime"] = pd.to_datetime(df["Age"], infer_datetime_format=True)
@@ -268,19 +269,19 @@ def test_matrix():
     # check input types
     with pytest.raises(TypeError):
         numpy_array = np.random.randn(10, 10)  # not a DataFrame
-        pps.matrix(numpy_array)
+        pps.matrix(numpy_array, n_jobs=n_jobs)
 
     with pytest.raises(ValueError):
-        pps.matrix(df, output="invalid_output_type")
+        pps.matrix(df, output="invalid_output_type", n_jobs=n_jobs)
 
     # check return types
-    assert isinstance(pps.matrix(df), pd.DataFrame)
-    assert isinstance(pps.matrix(df, output="list"), list)
+    assert isinstance(pps.matrix(df, n_jobs=n_jobs), pd.DataFrame)
+    assert isinstance(pps.matrix(df, output="list", n_jobs=n_jobs), list)
 
     # matrix catches single score errors under the hood
     invalid_score = [
         score
-        for score in pps.matrix(subset_df, output="list")
+        for score in pps.matrix(subset_df, output="list", n_jobs=n_jobs)
         if (score["x"] == "Survived" and score["y"] == "Age_datetime")
     ][0]
     assert invalid_score["ppscore"] == 0
