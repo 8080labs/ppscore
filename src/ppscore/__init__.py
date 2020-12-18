@@ -12,3 +12,4 @@ finally:
 
 
 from ppscore.calculation import score, predictors, matrix
+from ppscore.analyze import nonlinear_features
