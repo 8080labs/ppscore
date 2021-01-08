@@ -15,12 +15,13 @@ from pandas.api.types import (
     is_timedelta64_dtype,
 )
 
+
 NOT_SUPPORTED_ANYMORE = "NOT_SUPPORTED_ANYMORE"
 TO_BE_CALCULATED = -1
 
 
 def _calculate_model_cv_score_(
-        df, target, feature, task, cross_validation, random_seed, **kwargs
+    df, target, feature, task, cross_validation, random_seed, **kwargs
 ):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
@@ -114,6 +115,7 @@ def _f1_normalizer(df, y, model_score, random_seed):
     ppscore = _normalized_f1_score(model_score, baseline_score)
     return ppscore, baseline_score
 
+
 VALID_CALCULATIONS = {
     "regression": {
         "type": "regression",
@@ -194,10 +196,10 @@ INVALID_CALCULATIONS = [
 def _dtype_represents_categories(series) -> bool:
     "Determines if the dtype of the series represents categorical values"
     return (
-            is_bool_dtype(series)
-            or is_object_dtype(series)
-            or is_string_dtype(series)
-            or is_categorical_dtype(series)
+        is_bool_dtype(series)
+        or is_object_dtype(series)
+        or is_string_dtype(series)
+        or is_categorical_dtype(series)
     )
 
 
@@ -294,7 +296,7 @@ def _is_column_in_df(column, df):
 
 
 def _score(
-        df, x, y, task, sample, cross_validation, random_seed, invalid_score, catch_errors
+    df, x, y, task, sample, cross_validation, random_seed, invalid_score, catch_errors
 ):
     df, case_type = _determine_case_and_prepare_df(
         df, x, y, sample=sample, random_seed=random_seed
@@ -334,16 +336,16 @@ def _score(
 
 
 def score(
-        df,
-        x,
-        y,
-        pipeline=False,
-        task=NOT_SUPPORTED_ANYMORE,
-        sample=5_000,
-        cross_validation=4,
-        random_seed=123,
-        invalid_score=0,
-        catch_errors=True,
+    df,
+    x,
+    y,
+    pipeline=False,
+    task=NOT_SUPPORTED_ANYMORE,
+    sample=5_000,
+    cross_validation=4,
+    random_seed=123,
+    invalid_score=0,
+    catch_errors=True,
 ):
     """
     Calculate the Predictive Power Score (PPS) for "x predicts y"
