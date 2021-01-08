@@ -23,7 +23,6 @@ __Improvements:__
 - Improve error message when using the wrong API ([#31](https://github.com/8080labs/ppscore/issues/31))
 - Automatic error catching for convenience with optional error inspection/debugging: added `catch_errors` to `pps.score` and added corresponding case `unknown_error`
 
-
 ## [1.0.0]
 __Breaking changes:__
 - The case of the calculation for `regression` or `classification` __only depends on the data types__ and not the cardinality of a column any more. Also, it is not possible any more to pass the `task` to `pps.score`. This removes confusion about the inference of the final task. Some other special cases like `feature_is_id` still review the cardinality of a column.
