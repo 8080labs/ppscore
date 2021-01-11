@@ -8,6 +8,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ## [1.2.1] (unreleased)
 __Improvements:__
 - Added keyword argument to allow sklearn.pipeline transformers as input for the scorer. ([#34](https://github.com/8080labs/ppscore/issues/34))
+- ...
 
 ## [1.1.1]
 __Improvements:__
