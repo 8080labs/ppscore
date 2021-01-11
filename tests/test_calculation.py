@@ -121,7 +121,20 @@ def test_score():
         "unique_column_name",
     ]
 
-    # check input types
+    dtypes_df = pd.read_csv("examples/titanic.csv")
+    dtypes_df = dtypes_df.rename(
+        columns={
+            "Age": "Age_float",
+            "Sex": "Sex_object",
+            "Pclass": "Pclass_integer",
+            "Survived": "Survived_integer",
+            "Ticket": "Ticket_object",
+            "Name": "Name_object_id",
+        }
+    )
+    dtypes_df["Survived_Int64"] = dtypes_df["Survived_integer"].astype("Int64")
+
+    ### check input types
     with pytest.raises(TypeError):
         numpy_array = np.random.randn(10, 10)  # not a DataFrame
         pps.score(numpy_array, "x", "y")
@@ -148,7 +161,7 @@ def test_score():
             duplicate_column_names_df, "unique_column_name", "duplicate_column_name"
         )
 
-    # check cross_validation
+    ### check cross_validation
     # if more folds than data, there is an error
     with pytest.raises(ValueError):
         assert pps.score(df, "x", "y", cross_validation=2000, catch_errors=False)
@@ -171,7 +184,17 @@ def test_score():
     )
 
     # check catch_errors using the cross_validation error from above
-    assert pps.score(df, "x", "y", cross_validation=2000, invalid_score=invalid_score, catch_errors=True)["ppscore"] == invalid_score
+    assert (
+        pps.score(
+            df,
+            "x",
+            "y",
+            cross_validation=2000,
+            invalid_score=invalid_score,
+            catch_errors=True,
+        )["ppscore"]
+        == invalid_score
+    )
 
     # check case discrimination
     assert pps.score(df, "x", "y")["case"] == "regression"
@@ -181,7 +204,7 @@ def test_score():
     assert pps.score(df, "x", "id")["case"] == "target_is_id"
     assert pps.score(df, "nan", "y")["case"] == "empty_dataframe_after_dropping_na"
 
-    # check scores
+    ### check scores
     # feature is id
     assert pps.score(df, "id", "y")["ppscore"] == 0
 
@@ -212,6 +235,15 @@ def test_score():
     # category feature or target
     assert pps.score(df, "x", "x_greater_0_boolean_category")["ppscore"] > 0.6
     assert pps.score(df, "x_greater_0_boolean_category", "x")["ppscore"] < 0.6
+
+    ### check special dtypes
+    # pd.IntegerArray e.g. Int64, Int8, etc
+    assert (
+        pps.score(dtypes_df, "Survived_Int64", "Sex_object")["is_valid_score"] is True
+    )
+    assert (
+        pps.score(dtypes_df, "Sex_object", "Survived_Int64")["is_valid_score"] is True
+    )
 
 
 def test_predictors():
