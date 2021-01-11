@@ -2,6 +2,7 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+
 ## [dev] (unreleased)
 - ...
 
@@ -11,7 +12,7 @@ __Improvements:__
 
 ## [1.1.1]
 __Improvements:__
-- Add installation of requirements
+- When installing `ppscore` automatically install dependencies. ([#29](https://github.com/8080labs/ppscore/issues/29))
 
 ## [1.1.0]
 __Default changes:__
@@ -20,6 +21,7 @@ __Default changes:__
 __Improvements:__
 - Improve error message when using the wrong API ([#31](https://github.com/8080labs/ppscore/issues/31))
 - Automatic error catching for convenience with optional error inspection/debugging: added `catch_errors` to `pps.score` and added corresponding case `unknown_error`
+
 
 ## [1.0.0]
 __Breaking changes:__
