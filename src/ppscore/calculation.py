@@ -1,3 +1,5 @@
+import numpy as np
+
 from sklearn import tree
 from sklearn import preprocessing
 from sklearn.model_selection import cross_val_score
@@ -52,7 +54,10 @@ def _calculate_model_cv_score_(
         feature_input = sparse_matrix
     else:
         # reshaping needed because there is only 1 feature
-        feature_input = df[feature].values.reshape(-1, 1)
+        array = df[feature].values
+        if not isinstance(array, np.ndarray):  # e.g Int64 IntegerArray
+            array = array.to_numpy()
+        feature_input = array.reshape(-1, 1)
 
     # Cross-validation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
