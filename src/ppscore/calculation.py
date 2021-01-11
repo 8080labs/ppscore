@@ -363,7 +363,9 @@ def score(
         Name of the column x which acts as the feature
     y : str
         Name of the column y which acts as the target
-    pipeline : list of sklearn preprocessors.
+    pipeline : list of sklearn transforms.
+        A list containing instances of sklearn transform instances.
+        These transforms will be validated together.
     sample : int or `None`
         Number of rows for sampling. The sampling decreases the calculation time of the PPS.
         If `None` there will be no sampling.
