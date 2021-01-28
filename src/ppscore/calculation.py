@@ -4,7 +4,12 @@ from sklearn import tree
 from sklearn import preprocessing
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import mean_absolute_error, f1_score
+from itertools import product
+from tqdm import tqdm
+from functools import partial
+import multiprocessing as mp
 
+import numpy as np
 import pandas as pd
 from pandas.api.types import (
     is_numeric_dtype,
@@ -299,6 +304,15 @@ def _is_column_in_df(column, df):
         return False
 
 
+def get_random_seed(random_seed=None):
+    if random_seed is None:
+        from random import random
+
+        random_seed = int(random() * 1000)
+
+    return random_seed
+
+
 def _score(
     df, x, y, task, sample, cross_validation, random_seed, invalid_score, catch_errors
 ):
@@ -412,11 +426,6 @@ def score(
             "The attribute 'task' is no longer supported because it led to confusion and inconsistencies.\nThe task of the model is now determined based on the data types of the columns. If you want to change the task please adjust the data type of the column.\nFor more details, please refer to the README"
         )
 
-    if random_seed is None:
-        from random import random
-
-        random_seed = int(random() * 1000)
-
     try:
         return _score(
             df,
@@ -425,7 +434,7 @@ def score(
             task,
             sample,
             cross_validation,
-            random_seed,
+            get_random_seed(random_seed),
             invalid_score,
             catch_errors,
         )
@@ -466,6 +475,12 @@ def _get_task(case_type, invalid_score):
     raise Exception(f"case_type {case_type} is not supported")
 
 
+# wrapper for multiprocessing
+def worker_wrapper(arg):
+    fun, args, kwargs = arg
+    return fun(*args, **kwargs)
+
+
 def _format_list_of_dicts(scores, output, sorted):
     """
     Format list of score dicts `scores`
@@ -494,7 +509,35 @@ def _format_list_of_dicts(scores, output, sorted):
     return scores
 
 
-def predictors(df, y, output="df", sorted=True, **kwargs):
+def _list_predictors(df, iterator, verbose=False, **kwargs):
+    if verbose:
+        iterator = tqdm(iterator, total=len(iterator))
+    scores = [score(df, x, y, **kwargs) for x, y in iterator]
+
+    return scores
+
+
+def _parallel_predictors(df, iterator, n_jobs, verbose, presample, **kwargs):
+    if n_jobs == 1:
+        scores = _list_predictors(df, iterator, verbose=verbose, **kwargs)
+    else:
+        n_jobs = mp.cpu_count() if n_jobs == -1 else n_jobs
+
+        df = df.sample(min(presample, df.shape[0]),
+                       random_state=get_random_seed(kwargs.get("random_seed")))
+
+        with mp.Pool(n_jobs) as pool:
+            chunks = np.array_split(iterator, n_jobs)
+            pool_iterator = pool.starmap(
+                partial(_list_predictors, **kwargs),
+                [(df, chunk) for chunk in chunks]
+            )
+            scores = list(sum(pool_iterator, []))
+
+    return scores
+
+
+def predictors(df, y, output="df", sorted=True, n_jobs=1, presample=20_000, verbose=True, **kwargs):
     """
     Calculate the Predictive Power Score (PPS) of all the features in the dataframe
     against a target column
@@ -509,10 +552,15 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Control the type of the output. Either return a pandas.DataFrame (df) or a list with the score dicts
     sorted: bool
         Whether or not to sort the output dataframe/list by the ppscore
+    verbose: bool
+        tqdm bar for calculations
+    presample: int
+        sampling for optimize parallel computing, affects only if n_jobs!=1
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
         e.g. `sample, `cross_validation, `random_seed, `invalid_score`, `catch_errors`
-
+    n_jobs:
+        worker processes for calculations, -1 for all
     Returns
     -------
     pandas.DataFrame or list of Dict
@@ -540,12 +588,14 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
             f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
         )
 
-    scores = [score(df, column, y, **kwargs) for column in df if column != y]
+    iterator = [(column, y) for column in df if column != y]
+
+    scores = _parallel_predictors(df, iterator, n_jobs, verbose, presample)
 
     return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)
 
 
-def matrix(df, output="df", sorted=False, **kwargs):
+def matrix(df, output="df", sorted=False, verbose=True, n_jobs=1, presample=20_000, **kwargs):
     """
     Calculate the Predictive Power Score (PPS) matrix for all columns in the dataframe
 
@@ -557,6 +607,12 @@ def matrix(df, output="df", sorted=False, **kwargs):
         Control the type of the output. Either return a pandas.DataFrame (df) or a list with the score dicts
     sorted: bool
         Whether or not to sort the output dataframe/list by the ppscore
+    verbose: bool
+        tqdm bar for calculations
+    n_jobs: int
+        worker processes for calculations, -1 for all
+    presample: int
+        sampling for optimize parallel computing, affects only if n_jobs!=1
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
         e.g. `sample, `cross_validation, `random_seed, `invalid_score`, `catch_errors`
@@ -580,6 +636,8 @@ def matrix(df, output="df", sorted=False, **kwargs):
             f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
         )
 
-    scores = [score(df, x, y, **kwargs) for x in df for y in df]
+    iterator = list(product(df.columns, df.columns))
+
+    scores = _parallel_predictors(df, iterator, n_jobs, verbose, presample, **kwargs)
 
     return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)
