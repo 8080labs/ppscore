@@ -1,0 +1,8 @@
+Collecting scipy
+  Downloading scipy-1.7.2.tar.gz (36.1 MB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'canceled'
