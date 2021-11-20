@@ -62,7 +62,7 @@ def _calculate_model_cv_score_(
     # Cross-validation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
     scores = cross_val_score(
-        model, feature_input, target_series, cv=cross_validation, scoring=metric
+        model, feature_input, target_series.to_numpy(), cv=cross_validation, scoring=metric
     )
 
     return scores.mean()
@@ -83,7 +83,7 @@ def _normalized_mae_score(model_mae, naive_mae):
 def _mae_normalizer(df, y, model_score, **kwargs):
     "In case of MAE, calculates the baseline score for y and derives the PPS."
     df["naive"] = df[y].median()
-    baseline_score = mean_absolute_error(df[y], df["naive"])  # true, pred
+    baseline_score = mean_absolute_error(df[y].to_numpy(), df["naive"].to_numpy())  # true, pred
 
     ppscore = _normalized_mae_score(abs(model_score), baseline_score)
     return ppscore, baseline_score
