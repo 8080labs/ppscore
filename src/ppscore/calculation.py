@@ -25,17 +25,18 @@ TO_BE_CALCULATED = -1
 
 SKLEARN = "sklearn"
 TENSORFLOW = "tensorflow"
+CLASSIFICATION, REGRESSION = "classification", "regression"
 
 def _setup_model(task, platform_type):
     "Creates a model based on the task and platform type"
-    if task["type"] == "classification":
+    if task["type"] == CLASSIFICATION:
         if platform_type == SKLEARN:
             task["model"] = tree.DecisionTreeClassifier()
         elif platform_type == TENSORFLOW:
             task["model"] = tfdf.keras.CartModel(task=tfdf.keras.Task.CLASSIFICATION)
-    elif task["type"] == "regression":
+    elif task["type"] == REGRESSION:
         if platform_type == SKLEARN:
-            task["model"] = tree.DecisionTreeRegression()
+            task["model"] = tree.DecisionTreeRegressor()
         elif platform_type == TENSORFLOW:
             task["model"] = tfdf.keras.CartModel(task=tfdf.keras.Task.REGRESSION)
 
@@ -65,6 +66,7 @@ def _by_tensorflow(task, platform_type, feature_input, target_series, cross_vali
 def _by_sklearn(task, platform_type, feature_input, target_series, cross_validation, metric):
     # Cross-validation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
+    _setup_model(task, platform_type)
     model = task["model"]
     scores = cross_val_score(
         model, feature_input, target_series.to_numpy(), cv=cross_validation, scoring=metric
@@ -88,7 +90,7 @@ def _calculate_model_cv_score_(
     df = df.sample(frac=1, random_state=random_seed, replace=False)
 
     # preprocess target
-    if task["type"] == "classification":
+    if task["type"] == CLASSIFICATION:
         label_encoder = preprocessing.LabelEncoder()
         df[target] = label_encoder.fit_transform(df[target])
         target_series = df[target]
@@ -168,8 +170,8 @@ def _f1_normalizer(df, y, model_score, random_seed):
 
 
 VALID_CALCULATIONS = {
-    "regression": {
-        "type": "regression",
+    REGRESSION: {
+        "type": REGRESSION,
         "is_valid_score": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
@@ -179,8 +181,8 @@ VALID_CALCULATIONS = {
         "model": None,#tree.DecisionTreeRegressor(),
         "score_normalizer": _mae_normalizer,
     },
-    "classification": {
-        "type": "classification",
+    CLASSIFICATION: {
+        "type": CLASSIFICATION,
         "is_valid_score": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
@@ -284,10 +286,10 @@ def _determine_case_and_prepare_df(df, x, y, sample=5_000, random_seed=123):
         return df, "target_is_id"
 
     if _dtype_represents_categories(df[y]):
-        return df, "classification"
+        return df, CLASSIFICATION
     if is_numeric_dtype(df[y]):
         # this check needs to be after is_bool_dtype (which is part of _dtype_represents_categories) because bool is considered numeric by pandas
-        return df, "regression"
+        return df, REGRESSION
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
         # IDEA: show warning
@@ -354,7 +356,7 @@ def _score(
     )
     task = _get_task(case_type, invalid_score)
 
-    if case_type in ["classification", "regression"]:
+    if case_type in [CLASSIFICATION, REGRESSION]:
         model_score = _calculate_model_cv_score_(
             df,
             target=y,
