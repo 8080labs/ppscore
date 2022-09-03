@@ -1,5 +1,7 @@
 import numpy as np
 
+from tqdm import tqdm
+
 from sklearn import tree
 from sklearn import preprocessing
 from sklearn.model_selection import cross_val_score, cross_val_predict
@@ -605,9 +607,10 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
             f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
         )
 
-    scores = [score(df, column, y, **kwargs) for column in df if column != y]
+    scores = [score(df, column, y, **kwargs) for column in tqdm(df.columns) if column != y]
 
     return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)
+
 
 
 def matrix(df, output="df", sorted=False, **kwargs):
@@ -645,6 +648,6 @@ def matrix(df, output="df", sorted=False, **kwargs):
             f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
         )
 
-    scores = [score(df, x, y, **kwargs) for x in df for y in df]
+    scores = [score(df, x, y, **kwargs) for x in tqdm(df.columns) for y in df.columns]
 
     return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)
