@@ -2,8 +2,8 @@ import numpy as np
 
 from sklearn import tree
 from sklearn import preprocessing
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import mean_absolute_error, f1_score
+from sklearn.model_selection import cross_val_score, cross_val_predict
+from sklearn.metrics import mean_absolute_error, f1_score, roc_auc_score, r2_score
 
 import pandas as pd
 from pandas.api.types import (
@@ -22,7 +22,7 @@ TO_BE_CALCULATED = -1
 
 
 def _calculate_model_cv_score_(
-    df, target, feature, task, cross_validation, random_seed, **kwargs
+    df, target, feature, task, cross_validation, random_seed, sample_weight = None, **kwargs
 ):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
@@ -38,14 +38,18 @@ def _calculate_model_cv_score_(
     # this approach might be wrong for timeseries because it might leak information
     df = df.sample(frac=1, random_state=random_seed, replace=False)
 
+    scoring_method = None
     # preprocess target
     if task["type"] == "classification":
         label_encoder = preprocessing.LabelEncoder()
         df[target] = label_encoder.fit_transform(df[target])
         target_series = df[target]
+        scoring_method = "predict_proba"
     else:
-        target_series = df[target]
+        target_series = preprocessing.quantile_transform(df[[target]]).flatten()
+        scoring_method = "predict"
 
+    
     # preprocess feature
     if _dtype_represents_categories(df[feature]):
         one_hot_encoder = preprocessing.OneHotEncoder()
@@ -58,14 +62,39 @@ def _calculate_model_cv_score_(
         if not isinstance(array, np.ndarray):  # e.g Int64 IntegerArray
             array = array.to_numpy()
         feature_input = array.reshape(-1, 1)
+        feature_input = preprocessing.quantile_transform(feature_input)
+
 
     # Cross-validation is stratifiedKFold for classification, KFold for regression
     # CV on one core (n_job=1; default) has shown to be fastest
-    scores = cross_val_score(
-        model, feature_input, target_series.to_numpy(), cv=cross_validation, scoring=metric
-    )
+    sample_weight = None if sample_weight is None else df[sample_weight]
+    fit_params = {"sample_weight":sample_weight} if not sample_weight is None else None
+    
+    preds = cross_val_predict(
+        model, feature_input, target_series, cv=cross_validation, n_jobs=-1,
+        fit_params=fit_params, pre_dispatch='2*n_jobs', method=scoring_method)
+    
+    
+    if task["type"] == "classification":
+        model_score = roc_auc_score(
+            target_series,
+            preds,
+            average="weighted",
+            sample_weight=sample_weight if sample_weight is None else df[sample_weight],
+            max_fpr=None,
+            multi_class="ovr",
+            labels=None
+        )
+    
+    else:        
+        model_score = r2_score(
+            target_series,
+            preds,
+            sample_weight=sample_weight if sample_weight is None else df[sample_weight],
+            multioutput='uniform_average',
+        )
 
-    return scores.mean()
+    return model_score
 
 
 def _normalized_mae_score(model_mae, naive_mae):
@@ -80,12 +109,26 @@ def _normalized_mae_score(model_mae, naive_mae):
         return 1 - (model_mae / naive_mae)
 
 
+def _normalized_r2_score(model_r2, naive_r2):
+    "Normalizes the model R2 score, given the baseline score"
+    if model_r2 < naive_r2:
+        return 0
+    else:
+        return model_r2
+
+    
 def _mae_normalizer(df, y, model_score, **kwargs):
     "In case of MAE, calculates the baseline score for y and derives the PPS."
     df["naive"] = df[y].median()
     baseline_score = mean_absolute_error(df[y].to_numpy(), df["naive"].to_numpy())  # true, pred
 
     ppscore = _normalized_mae_score(abs(model_score), baseline_score)
+    return ppscore, baseline_score
+
+def _r2_normalizer(df, y, model_score, **kwargs):
+    "In case of MAE, calculates the baseline score for y and derives the PPS."        
+    baseline_score = 0
+    ppscore = _normalized_r2_score(model_score, baseline_score)
     return ppscore, baseline_score
 
 
@@ -102,6 +145,18 @@ def _normalized_f1_score(model_f1, baseline_f1):
         scale_range = 1.0 - baseline_f1  # eg 0.3
         f1_diff = model_f1 - baseline_f1  # eg 0.1
         return f1_diff / scale_range  # 0.1/0.3 = 0.33
+
+    
+def _normalized_auc_score(model_auc, baseline_auc):
+    "Normalizes the model auc score, given the baseline score"
+    # # AUC ranges from 0 to 1
+    # # 1 is best
+    if model_auc < baseline_auc:
+        return 0
+    else:
+        scale_range = 1.0 - baseline_auc  # eg 0.3
+        auc_diff = model_auc - baseline_auc  # eg 0.1
+        return auc_diff / scale_range  # 0.1/0.3 = 0.33
 
 
 def _f1_normalizer(df, y, model_score, random_seed):
@@ -120,6 +175,13 @@ def _f1_normalizer(df, y, model_score, random_seed):
     return ppscore, baseline_score
 
 
+def _auc_normalizer(df, y, model_score, **kwargs):
+    "calculates the baseline score for y and derives the PPS. Custom score should follow the same API as f1_score"    
+    baseline_score = 0.5
+    ppscore = _normalized_auc_score(model_score, baseline_score)
+    return ppscore, baseline_score
+
+
 VALID_CALCULATIONS = {
     "regression": {
         "type": "regression",
@@ -127,10 +189,10 @@ VALID_CALCULATIONS = {
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
-        "metric_name": "mean absolute error",
-        "metric_key": "neg_mean_absolute_error",
+        "metric_name": "r2",
+        "metric_key": "r2",
         "model": tree.DecisionTreeRegressor(),
-        "score_normalizer": _mae_normalizer,
+        "score_normalizer": _r2_normalizer,
     },
     "classification": {
         "type": "classification",
@@ -138,10 +200,10 @@ VALID_CALCULATIONS = {
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
-        "metric_name": "weighted F1",
-        "metric_key": "f1_weighted",
+        "metric_name": "weighted AUC",
+        "metric_key": "roc_auc",
         "model": tree.DecisionTreeClassifier(),
-        "score_normalizer": _f1_normalizer,
+        "score_normalizer": _auc_normalizer,
     },
     "predict_itself": {
         "type": "predict_itself",
@@ -300,7 +362,7 @@ def _is_column_in_df(column, df):
 
 
 def _score(
-    df, x, y, task, sample, cross_validation, random_seed, invalid_score, catch_errors
+    df, x, y, task, sample, cross_validation, random_seed, invalid_score, catch_errors, sample_weight, **kwargs
 ):
     df, case_type = _determine_case_and_prepare_df(
         df, x, y, sample=sample, random_seed=random_seed
@@ -315,6 +377,7 @@ def _score(
             task=task,
             cross_validation=cross_validation,
             random_seed=random_seed,
+            sample_weight = sample_weight
         )
         # IDEA: the baseline_scores do sometimes change significantly, e.g. for F1 and thus change the PPS
         # we might want to calculate the baseline_score 10 times and use the mean in order to have less variance
@@ -343,12 +406,13 @@ def score(
     df,
     x,
     y,
+    sample_weight = None,
     task=NOT_SUPPORTED_ANYMORE,
     sample=5_000,
     cross_validation=4,
     random_seed=123,
     invalid_score=0,
-    catch_errors=True,
+    catch_errors=False,
 ):
     """
     Calculate the Predictive Power Score (PPS) for "x predicts y"
@@ -428,6 +492,7 @@ def score(
             random_seed,
             invalid_score,
             catch_errors,
+            sample_weight = sample_weight,
         )
     except Exception as exception:
         if catch_errors:
