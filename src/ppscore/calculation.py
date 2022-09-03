@@ -412,7 +412,7 @@ def score(
     cross_validation=4,
     random_seed=123,
     invalid_score=0,
-    catch_errors=False,
+    catch_errors=True,
 ):
     """
     Calculate the Predictive Power Score (PPS) for "x predicts y"
