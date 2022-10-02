@@ -167,6 +167,11 @@ def test_score():
         assert pps.score(df, "x", "y", cross_validation=2000, catch_errors=False)
 
     # check random_seed
+    print(pps.score(df, "x", "y", random_seed=1))
+    print(pps.score(df, "x", "y", random_seed=1))
+    print(pps.score(df, "x", "y", random_seed=1) == pps.score(
+        df, "x", "y", random_seed=1
+    ))
     assert pps.score(df, "x", "y", random_seed=1) == pps.score(
         df, "x", "y", random_seed=1
     )
@@ -316,3 +321,15 @@ def test_matrix():
         if (score["x"] == "Survived" and score["y"] == "Age_datetime")
     ][0]
     assert invalid_score["ppscore"] == 0
+
+def main():
+    test_score()
+    test_predictors()
+    test_matrix()
+    test__determine_case_and_prepare_df()
+    test__maybe_sample()
+    test__normalized_f1_score()
+    test__normalized_mae_score()
+
+if __name__ == "__main__":
+    main()

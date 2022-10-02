@@ -48,7 +48,7 @@ df = df.rename(columns={"Embarked": "Port"})
 # - Answering the question: how well can Sex predict the Survival probability?
 
 # %%
-pps.score(df, "Sex", "Survived")
+pps.score(df, "Sex", "Survived",'sklearn')
 
 # %% [markdown]
 # ## PPS matrix
