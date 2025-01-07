@@ -266,4 +266,4 @@ In the following cases, the PPS is not defined and the score is set to `invalid_
 [![DOI](https://zenodo.org/badge/256518683.svg)](https://zenodo.org/badge/latestdoi/256518683)
 
 ## About
-ppscore is developed by [8080 Labs](https://8080labs.com) - we create tools for Python Data Scientists. If you like `ppscore` you might want to check out our other project [bamboolib - a GUI for pandas DataFrames](https://bamboolib.com)
+ppscore is developed by 8080 Labs - we create tools for Python Data Scientists. If you like `ppscore` you might want to check out our other project [bamboolib - a GUI for pandas DataFrames](https://docs.databricks.com/en/archive/notebooks/bamboolib.html)
