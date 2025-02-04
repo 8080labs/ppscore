@@ -4,7 +4,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 
 ## [dev] (unreleased)
-- ...
+__Improvements:__
+- When tensorflow-gpu is available, option platform='tensorflow' can utilize GPU for calculating score.
 
 ## [1.2.0]
 __Improvements:__
