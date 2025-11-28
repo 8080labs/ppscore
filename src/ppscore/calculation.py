@@ -1,9 +1,12 @@
+from typing import Text
 import numpy as np
 
 from sklearn import tree
 from sklearn import preprocessing
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.metrics import mean_absolute_error, f1_score
+
+import tensorflow_decision_forests as tfdf
 
 import pandas as pd
 from pandas.api.types import (
@@ -20,9 +23,58 @@ from pandas.api.types import (
 NOT_SUPPORTED_ANYMORE = "NOT_SUPPORTED_ANYMORE"
 TO_BE_CALCULATED = -1
 
+SKLEARN = "sklearn"
+TENSORFLOW = "tensorflow"
+CLASSIFICATION, REGRESSION = "classification", "regression"
+
+def _setup_model(task, platform_type):
+    "Creates a model based on the task and platform type"
+    if task["type"] == CLASSIFICATION:
+        if platform_type == SKLEARN:
+            task["model"] = tree.DecisionTreeClassifier()
+        elif platform_type == TENSORFLOW:
+            task["model"] = tfdf.keras.CartModel(task=tfdf.keras.Task.CLASSIFICATION)
+    elif task["type"] == REGRESSION:
+        if platform_type == SKLEARN:
+            task["model"] = tree.DecisionTreeRegressor()
+        elif platform_type == TENSORFLOW:
+            task["model"] = tfdf.keras.CartModel(task=tfdf.keras.Task.REGRESSION)
+
+def _evaluation_tfdf_model(model,x,y,metric,scores):
+    scoring_dic = {"neg_mean_absolute_error": mean_absolute_error,
+                    "f1_weighted": f1_score
+                    }
+    predictions_output = model.predict(x)
+    predictions = np.argmax(predictions_output, axis=1)
+    if metric == "neg_mean_absolute_error":
+        scores.append(scoring_dic[metric](y, predictions))
+    elif metric == "f1_weighted":
+        scores.append(scoring_dic[metric](y, predictions, average="weighted"))
+
+def _by_tensorflow(task, platform_type, feature_input, target_series, cross_validation, metric):
+    "Calculates the model score based on tensorflow"
+    scores = []
+    kfold = StratifiedKFold(n_splits=cross_validation)
+    for train,test in kfold.split(feature_input, target_series):
+        _setup_model(task, platform_type)
+        model = task["model"]
+        model.complie(metrics=metric)
+        model.fit(feature_input[train], target_series[train])
+        _evaluation_tfdf_model(model, feature_input[test], target_series[test], metric, scores)
+    return np.array(scores)
+
+def _by_sklearn(task, platform_type, feature_input, target_series, cross_validation, metric):
+    # Cross-validation is stratifiedKFold for classification, KFold for regression
+    # CV on one core (n_job=1; default) has shown to be fastest
+    _setup_model(task, platform_type)
+    model = task["model"]
+    scores = cross_val_score(
+        model, feature_input, target_series.to_numpy(), cv=cross_validation, scoring=metric
+    )
+    return np.array(scores)
 
 def _calculate_model_cv_score_(
-    df, target, feature, task, cross_validation, random_seed, **kwargs
+    df, target, feature, task, platform_type, cross_validation, random_seed, **kwargs
 ):
     "Calculates the mean model score based on cross-validation"
     # Sources about the used methods:
@@ -30,7 +82,6 @@ def _calculate_model_cv_score_(
     # https://scikit-learn.org/stable/modules/cross_validation.html
     # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html
     metric = task["metric_key"]
-    model = task["model"]
     # shuffle the rows - this is important for cross-validation
     # because the cross-validation just takes the first n lines
     # if there is a strong pattern in the rows eg 0,0,0,0,1,1,1,1
@@ -39,7 +90,7 @@ def _calculate_model_cv_score_(
     df = df.sample(frac=1, random_state=random_seed, replace=False)
 
     # preprocess target
-    if task["type"] == "classification":
+    if task["type"] == CLASSIFICATION:
         label_encoder = preprocessing.LabelEncoder()
         df[target] = label_encoder.fit_transform(df[target])
         target_series = df[target]
@@ -59,12 +110,10 @@ def _calculate_model_cv_score_(
             array = array.to_numpy()
         feature_input = array.reshape(-1, 1)
 
-    # Cross-validation is stratifiedKFold for classification, KFold for regression
-    # CV on one core (n_job=1; default) has shown to be fastest
-    scores = cross_val_score(
-        model, feature_input, target_series.to_numpy(), cv=cross_validation, scoring=metric
-    )
-
+    if platform_type == SKLEARN:
+        scores = _by_sklearn(task, platform_type, feature_input, target_series, cross_validation, metric)
+    elif platform_type == TENSORFLOW:
+        scores = _by_tensorflow(task, platform_type, feature_input, target_series, cross_validation, metric)
     return scores.mean()
 
 
@@ -121,26 +170,26 @@ def _f1_normalizer(df, y, model_score, random_seed):
 
 
 VALID_CALCULATIONS = {
-    "regression": {
-        "type": "regression",
+    REGRESSION: {
+        "type": REGRESSION,
         "is_valid_score": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
         "metric_name": "mean absolute error",
         "metric_key": "neg_mean_absolute_error",
-        "model": tree.DecisionTreeRegressor(),
+        "model": None,#tree.DecisionTreeRegressor(),
         "score_normalizer": _mae_normalizer,
     },
-    "classification": {
-        "type": "classification",
+    CLASSIFICATION: {
+        "type": CLASSIFICATION,
         "is_valid_score": True,
         "model_score": TO_BE_CALCULATED,
         "baseline_score": TO_BE_CALCULATED,
         "ppscore": TO_BE_CALCULATED,
         "metric_name": "weighted F1",
         "metric_key": "f1_weighted",
-        "model": tree.DecisionTreeClassifier(),
+        "model": None,#tree.DecisionTreeClassifier(),
         "score_normalizer": _f1_normalizer,
     },
     "predict_itself": {
@@ -237,10 +286,10 @@ def _determine_case_and_prepare_df(df, x, y, sample=5_000, random_seed=123):
         return df, "target_is_id"
 
     if _dtype_represents_categories(df[y]):
-        return df, "classification"
+        return df, CLASSIFICATION
     if is_numeric_dtype(df[y]):
         # this check needs to be after is_bool_dtype (which is part of _dtype_represents_categories) because bool is considered numeric by pandas
-        return df, "regression"
+        return df, REGRESSION
 
     if is_datetime64_any_dtype(df[y]) or is_timedelta64_dtype(df[y]):
         # IDEA: show warning
@@ -300,19 +349,20 @@ def _is_column_in_df(column, df):
 
 
 def _score(
-    df, x, y, task, sample, cross_validation, random_seed, invalid_score, catch_errors
+    df, x, y, task, platform_type, sample, cross_validation, random_seed, invalid_score, catch_errors
 ):
     df, case_type = _determine_case_and_prepare_df(
         df, x, y, sample=sample, random_seed=random_seed
     )
     task = _get_task(case_type, invalid_score)
 
-    if case_type in ["classification", "regression"]:
+    if case_type in [CLASSIFICATION, REGRESSION]:
         model_score = _calculate_model_cv_score_(
             df,
             target=y,
             feature=x,
             task=task,
+            platform_type=platform_type,
             cross_validation=cross_validation,
             random_seed=random_seed,
         )
@@ -343,6 +393,7 @@ def score(
     df,
     x,
     y,
+    platform_type=SKLEARN, 
     task=NOT_SUPPORTED_ANYMORE,
     sample=5_000,
     cross_validation=4,
@@ -423,6 +474,7 @@ def score(
             x,
             y,
             task,
+            platform_type,
             sample,
             cross_validation,
             random_seed,
@@ -494,7 +546,7 @@ def _format_list_of_dicts(scores, output, sorted):
     return scores
 
 
-def predictors(df, y, output="df", sorted=True, **kwargs):
+def predictors(df, y, output="df", sorted=True,  platform_type = SKLEARN, **kwargs):
     """
     Calculate the Predictive Power Score (PPS) of all the features in the dataframe
     against a target column
@@ -509,6 +561,8 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         Control the type of the output. Either return a pandas.DataFrame (df) or a list with the score dicts
     sorted: bool
         Whether or not to sort the output dataframe/list by the ppscore
+    platform_type: str - potential values: 'sklearn', 'tensorflow'
+        The platform that is used to calculate the pps. It is efficient to choose tensorflow if you would like to utilize GPU or TPU available.
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
         e.g. `sample, `cross_validation, `random_seed, `invalid_score`, `catch_errors`
@@ -539,13 +593,17 @@ def predictors(df, y, output="df", sorted=True, **kwargs):
         raise ValueError(
             f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
         )
+    if not platform_type in [SKLEARN,TENSORFLOW]:
+        raise ValueError(
+            f"""The 'platform_type' argument should be one of ["sklearn","tensorflow"] but you passed: {platform_type}\nPlease adjust your input to one of the valid values"""
+        )
 
-    scores = [score(df, column, y, **kwargs) for column in df if column != y]
+    scores = [score(df, column, y, platform_type, **kwargs) for column in df if column != y]
 
     return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)
 
 
-def matrix(df, output="df", sorted=False, **kwargs):
+def matrix(df, output="df",sorted=False,  platform_type = SKLEARN, **kwargs):
     """
     Calculate the Predictive Power Score (PPS) matrix for all columns in the dataframe
 
@@ -557,6 +615,8 @@ def matrix(df, output="df", sorted=False, **kwargs):
         Control the type of the output. Either return a pandas.DataFrame (df) or a list with the score dicts
     sorted: bool
         Whether or not to sort the output dataframe/list by the ppscore
+    platform_type: str - potential values: 'sklearn', 'tensorflow'
+        The platform that is used to calculate the pps. It is efficient to choose tensorflow if you would like to utilize GPU or TPU available.
     kwargs:
         Other key-word arguments that shall be forwarded to the pps.score method,
         e.g. `sample, `cross_validation, `random_seed, `invalid_score`, `catch_errors`
@@ -579,7 +639,10 @@ def matrix(df, output="df", sorted=False, **kwargs):
         raise ValueError(
             f"""The 'sorted' argument should be one of [True, False] but you passed: {sorted}\nPlease adjust your input to one of the valid values"""
         )
-
-    scores = [score(df, x, y, **kwargs) for x in df for y in df]
+    if not platform_type in [SKLEARN,TENSORFLOW]:
+        raise ValueError(
+            f"""The 'platform_type' argument should be one of ["sklearn","tensorflow"] but you passed: {platform_type}\nPlease adjust your input to one of the valid values"""
+        )
+    scores = [score(df, x, y, platform_type,  **kwargs) for x in df for y in df]
 
     return _format_list_of_dicts(scores=scores, output=output, sorted=sorted)

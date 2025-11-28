@@ -88,7 +88,7 @@ sns.heatmap(matrix_df, vmin=0, vmax=1, cmap="Blues", linewidths=0.5, annot=True)
 
 ## API
 
-### ppscore.score(df, x, y, sample=5_000, cross_validation=4, random_seed=123, invalid_score=0, catch_errors=True)
+### ppscore.score(df, x, y, platform_type='sklearn', sample=5_000, cross_validation=4, random_seed=123, invalid_score=0, catch_errors=True)
 
 Calculate the Predictive Power Score (PPS) for "x predicts y"
 
@@ -109,6 +109,8 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
     - Name of the column x which acts as the feature
 - __y__ : str
     - Name of the column y which acts as the target
+- __platform_type__: str - potential values: 'sklearn', 'tensorflow'
+    The platform that is used to calculate the pps. It is efficient to choose tensorflow if you would like to utilize GPU or TPU available.
 - __sample__ : int or `None`
     - Number of rows for sampling. The sampling decreases the calculation time of the PPS.
     If `None` there will be no sampling.
@@ -131,7 +133,7 @@ Calculate the Predictive Power Score (PPS) for "x predicts y"
     The dict enables introspection into the calculations that have been performed under the hood
 
 
-### ppscore.predictors(df, y, output="df", sorted=True, **kwargs)
+### ppscore.predictors(df, y, output="df", sorted=True, platform_type='sklearn', **kwargs)
 
 Calculate the Predictive Power Score (PPS) for all columns in the dataframe against a target (y) column
 
@@ -144,6 +146,8 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
     - Control the type of the output. Either return a df or a list with all the PPS score dicts
 - __sorted__ : bool
     - Whether or not to sort the output dataframe/list by the ppscore
+- __platform_type__: str - potential values: 'sklearn', 'tensorflow'
+    The platform that is used to calculate the pps. It is efficient to choose tensorflow if you would like to utilize GPU or TPU available.
 - __kwargs__ :
     - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, __random_seed__, __invalid_score__, __catch_errors__
 
@@ -153,7 +157,7 @@ Calculate the Predictive Power Score (PPS) for all columns in the dataframe agai
     - Either returns a df or a list of all the PPS dicts. This can be influenced by the output argument
 
 
-### ppscore.matrix(df, output="df", sorted=False, **kwargs)
+### ppscore.matrix(df, output="df", sorted=False, platform_type='sklearn', **kwargs)
 
 Calculate the Predictive Power Score (PPS) matrix for all columns in the dataframe
 
@@ -165,6 +169,8 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
     - Control the type of the output. Either return a df or a list with all the PPS score dicts
 - __sorted__ : bool
     - Whether or not to sort the output dataframe/list by the ppscore
+- __platform_type__: str - potential values: 'sklearn', 'tensorflow'
+    The platform that is used to calculate the pps. It is efficient to choose tensorflow if you would like to utilize GPU or TPU available.
 - __kwargs__ :
     - Other key-word arguments that shall be forwarded to the pps.score method, e.g. __sample__, __cross_validation__, __random_seed__, __invalid_score__, __catch_errors__
 
@@ -173,6 +179,8 @@ Calculate the Predictive Power Score (PPS) matrix for all columns in the datafra
 - __pandas.DataFrame__ or list of PPS dicts:
     - Either returns a df or a list of all the PPS dicts. This can be influenced by the output argument
 
+### Utilize GPU
+To utilze GPU, you have to install tensorflow-gpu first. Then, change platform_type into 'tensorflow'.
 
 ## Calculation of the PPS
 
