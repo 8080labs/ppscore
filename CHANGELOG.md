@@ -4,7 +4,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 
 ## [dev] (unreleased)
-- ...
+__Improvements:__
+- Remove deprecated `pkg_resources` dependency and replace it with `importlib.metadata`. ([#79](https://github.com/8080labs/ppscore/issues/79_))
 
 ## [1.2.0]
 __Improvements:__

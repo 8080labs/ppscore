@@ -19,7 +19,7 @@ The PPS is an asymmetric, data-type-agnostic score that can detect linear or non
 
 ## Installation
 
-> You need Python 3.6 or above.
+> You need Python 3.8 or above.
 
 From the terminal (or Anaconda prompt in Windows), enter:
 
